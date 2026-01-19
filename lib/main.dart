@@ -318,11 +318,14 @@ class _SignUpFormState extends State<SignUpForm> {
   bool isUserType = true;
   
   // User fields
-  final _nameController = TextEditingController();
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
+  final _middleInitialController = TextEditingController();
   final _emailController = TextEditingController();
   final _addressController = TextEditingController();
   final _contactController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController(); // NEW
   
   // Seller fields
   final _businessNameController = TextEditingController();
@@ -330,10 +333,13 @@ class _SignUpFormState extends State<SignUpForm> {
   final _businessAddressController = TextEditingController();
   final _businessContactController = TextEditingController();
   final _businessPasswordController = TextEditingController();
+  final _businessConfirmPasswordController = TextEditingController(); // NEW
+  
   String? _selectedBusinessType;
   
   bool _obscurePassword = true;
-
+  bool _obscureConfirmPassword = true; // NEW
+  
   final List<String> _businessTypes = [
     'Restaurant',
     'Retail Store',
@@ -348,26 +354,32 @@ class _SignUpFormState extends State<SignUpForm> {
 
   @override
   void dispose() {
-    _nameController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _middleInitialController.dispose();
     _emailController.dispose();
     _addressController.dispose();
     _contactController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose(); // NEW
+    
     _businessNameController.dispose();
     _businessEmailController.dispose();
     _businessAddressController.dispose();
     _businessContactController.dispose();
     _businessPasswordController.dispose();
+    _businessConfirmPasswordController.dispose(); // NEW
     super.dispose();
   }
 
   void _submitForm() {
     if (_formKey.currentState!.validate()) {
       if (isUserType) {
+        String fullName = "${_firstNameController.text} ${_middleInitialController.text} ${_lastNameController.text}".trim();
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => UserDashboard(userName: _nameController.text),
+            builder: (context) => UserDashboard(userName: fullName),
           ),
         );
       } else {
@@ -487,18 +499,59 @@ class _SignUpFormState extends State<SignUpForm> {
           const SizedBox(height: 24),
           // Form fields based on user type
           if (isUserType) ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: TextFormField(
+                    controller: _firstNameController,
+                    decoration: InputDecoration(
+                      labelText: 'First Name',
+                      prefixIcon: const Icon(Icons.person_outline),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Required';
+                      }
+                      return null;
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 1,
+                  child: TextFormField(
+                    controller: _middleInitialController,
+                    maxLength: 1,
+                    textAlign: TextAlign.center,
+                    decoration: InputDecoration(
+                      labelText: 'M.I.',
+                      counterText: "",
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
             TextFormField(
-              controller: _nameController,
+              controller: _lastNameController,
               decoration: InputDecoration(
-                labelText: 'Full Name',
-                prefixIcon: const Icon(Icons.person_outline),
+                labelText: 'Last Name',
+                prefixIcon: const Icon(Icons.badge_outlined),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return 'Please enter your name';
+                  return 'Required';
                 }
                 return null;
               },
@@ -588,6 +641,40 @@ class _SignUpFormState extends State<SignUpForm> {
                 }
                 if (value.length < 6) {
                   return 'Password must be at least 6 characters';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            // --- NEW: Confirm Password for User ---
+            TextFormField(
+              controller: _confirmPasswordController,
+              obscureText: _obscureConfirmPassword,
+              decoration: InputDecoration(
+                labelText: 'Confirm Password',
+                prefixIcon: const Icon(Icons.lock_outline),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscureConfirmPassword
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _obscureConfirmPassword = !_obscureConfirmPassword;
+                    });
+                  },
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please confirm your password';
+                }
+                if (value != _passwordController.text) {
+                  return 'Passwords do not match';
                 }
                 return null;
               },
@@ -726,6 +813,40 @@ class _SignUpFormState extends State<SignUpForm> {
                 return null;
               },
             ),
+            const SizedBox(height: 16),
+            // --- NEW: Confirm Password for Seller ---
+            TextFormField(
+              controller: _businessConfirmPasswordController,
+              obscureText: _obscureConfirmPassword,
+              decoration: InputDecoration(
+                labelText: 'Confirm Password',
+                prefixIcon: const Icon(Icons.lock_outline),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscureConfirmPassword
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _obscureConfirmPassword = !_obscureConfirmPassword;
+                    });
+                  },
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please confirm your password';
+                }
+                if (value != _businessPasswordController.text) {
+                  return 'Passwords do not match';
+                }
+                return null;
+              },
+            ),
           ],
           const SizedBox(height: 24),
           SizedBox(
@@ -785,73 +906,66 @@ class UserDashboard extends StatefulWidget {
   final String userName;
 
   const UserDashboard({Key? key, required this.userName}) : super(key: key);
-
   @override
   State<UserDashboard> createState() => _UserDashboardState();
 }
 
 class _UserDashboardState extends State<UserDashboard> {
   int _selectedIndex = 0;
-
-  // Inside _UserDashboardState class
-
-@override
-Widget build(BuildContext context) {
-  return Scaffold(
-    appBar: AppBar(
-      title: const Text('L.O.K.A.L'),
-      backgroundColor: Colors.blue,
-      foregroundColor: Colors.white,
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.qr_code_scanner),
-          onPressed: () {
-            // QR Code Scanner logic
-          },
-        ),
-        IconButton(
-          icon: const Icon(Icons.notifications_outlined),
-          onPressed: () {},
-        ),
-        // --- ADD THIS LOGOUT BUTTON HERE ---
-        IconButton(
-          icon: const Icon(Icons.logout),
-          tooltip: 'Sign Out',
-          onPressed: () {
-            // Navigate back to AuthPage (Sign In) and remove previous routes
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (context) => const AuthPage()),
-              (route) => false, // This prevents the user from going "back" to the dashboard
-            );
-          },
-        ),
-        // -----------------------------------
-      ],
-    ),
-    body: _selectedIndex == 0 ? _buildHomeTab() : _buildExploreTab(),
-    bottomNavigationBar: BottomNavigationBar(
-      currentIndex: _selectedIndex,
-      onTap: (index) {
-        setState(() {
-          _selectedIndex = index;
-        });
-      },
-      items: const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.home_outlined),
-          activeIcon: Icon(Icons.home),
-          label: 'Home',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.explore_outlined),
-          activeIcon: Icon(Icons.explore),
-          label: 'Explore',
-        ),
-      ],
-    ),
-  );
-}
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('L.O.K.A.L'),
+        backgroundColor: Colors.blue,
+        foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.qr_code_scanner),
+            onPressed: () {
+              // QR Code Scanner
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined),
+            onPressed: () {},
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Sign Out',
+            onPressed: () {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const AuthPage()),
+                (route) => false,
+              );
+            },
+          ),
+        ],
+      ),
+      body: _selectedIndex == 0 ? _buildHomeTab() : _buildExploreTab(),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+        },
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.explore_outlined),
+            activeIcon: Icon(Icons.explore),
+            label: 'Explore',
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildHomeTab() {
     return SingleChildScrollView(
@@ -1079,7 +1193,7 @@ Widget build(BuildContext context) {
                           ),
                         ),
                       ],
-                    ),
+                  ),
                   ),
                 ),
               ),
@@ -1274,7 +1388,6 @@ class SellerDashboard extends StatefulWidget {
   final String businessName;
 
   const SellerDashboard({Key? key, required this.businessName}) : super(key: key);
-
   @override
   State<SellerDashboard> createState() => _SellerDashboardState();
 }
@@ -1282,7 +1395,6 @@ class SellerDashboard extends StatefulWidget {
 class _SellerDashboardState extends State<SellerDashboard> {
   int _selectedIndex = 0;
   bool _isStoreOpen = true;
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
