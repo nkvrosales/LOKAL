@@ -1,0 +1,490 @@
+.admin-body {
+  background: #ffffff;
+}
+
+.admin-login-logo {
+  width: min(280px, 82vw);
+  height: auto;
+  max-height: 240px;
+  object-fit: contain;
+  border-radius: 22px;
+}
+
+.admin-shell {
+  padding: 22px;
+  display: grid;
+  gap: 18px;
+}
+
+.admin-bootstrap-card {
+  width: min(620px, 100%);
+}
+
+.admin-hero {
+  min-height: calc(100vh - 96px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 38%);
+  gap: 18px;
+}
+
+.admin-map-panel,
+.admin-summary-panel,
+.admin-section {
+  border: 1px solid rgba(255, 91, 46, 0.16);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.22);
+}
+
+.admin-map-panel {
+  min-height: 40vh;
+  position: relative;
+  overflow: hidden;
+}
+
+#admin-map {
+  width: 100%;
+  height: 100%;
+  min-height: 40vh;
+}
+
+.admin-map-status {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 450;
+  max-width: min(520px, calc(100% - 32px));
+  border-radius: 999px;
+  padding: 10px 14px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.82);
+  font-size: 13px;
+}
+
+.admin-summary-panel {
+  padding: 20px;
+  display: grid;
+  align-content: start;
+  gap: 16px;
+}
+
+.admin-summary-panel h1,
+.admin-section h1,
+.admin-section h2,
+.admin-detail-card h3 {
+  color: #FF5B2E;
+}
+
+.admin-summary-panel p,
+.admin-section-head p {
+  margin: 0;
+  color: rgba(0, 0, 0, 0.72);
+  line-height: 1.45;
+}
+
+.admin-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.admin-stat-grid article,
+.admin-live-card {
+  border-radius: 14px;
+  border: 1px solid rgba(255, 91, 46, 0.12);
+  background: rgba(255, 255, 255, 0.86);
+  padding: 12px;
+}
+
+.admin-stat-grid strong {
+  display: block;
+  color: #FF5B2E;
+  font-size: 26px;
+}
+
+.admin-stat-grid span,
+.admin-live-card p {
+  margin: 0;
+  color: rgba(0, 0, 0, 0.7);
+  font-size: 13px;
+}
+
+.admin-live-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.driver-live-dot {
+  width: 11px;
+  height: 11px;
+  flex: 0 0 11px;
+  border-radius: 50%;
+  background: #FF5B2E;
+  box-shadow: 0 0 0 6px rgba(255, 91, 46, 0.14);
+}
+
+.driver-live-dot.is-stale {
+  background: #FF5B2E;
+  box-shadow: 0 0 0 6px rgba(255, 91, 46, 0.12);
+}
+
+.map-marker.user {
+  background: #fff;
+  color: #000000;
+  border-color: #000000;
+}
+
+.map-marker.store {
+  background: #FF5B2E;
+  color: #000000;
+  border-color: #000000;
+}
+
+.map-marker.driver {
+  background: #FF5B2E;
+  color: #000000;
+  border-color: #000000;
+}
+
+.admin-route-list {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-route-list p {
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.admin-route-list button {
+  text-align: left;
+  border: 1px solid rgba(255, 91, 46, 0.14);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.84);
+  padding: 10px;
+  color: #000000;
+  cursor: pointer;
+}
+
+.admin-route-list button.active {
+  border-color: rgba(255, 91, 46, 0.42);
+  background: rgba(255, 91, 46, 0.22);
+}
+
+.admin-route-list strong,
+.admin-route-list span {
+  display: block;
+}
+
+.admin-route-list span {
+  margin-top: 3px;
+  color: rgba(0, 0, 0, 0.68);
+  font-size: 12px;
+}
+
+.admin-section {
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+}
+
+.admin-section-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-add-form {
+  display: grid;
+  gap: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 91, 46, 0.12);
+  background: rgba(255, 255, 255, 0.68);
+  padding: 14px;
+}
+
+.admin-add-form .btn {
+  justify-self: start;
+}
+
+.admin-table-wrap {
+  overflow-x: auto;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 820px;
+}
+
+.admin-action-table {
+  min-width: 980px;
+}
+
+.admin-table th,
+.admin-table td {
+  border-bottom: 1px solid rgba(255, 91, 46, 0.1);
+  padding: 10px;
+  text-align: left;
+  font-size: 13px;
+}
+
+.admin-table th {
+  color: #FF5B2E;
+  background: rgba(255, 91, 46, 0.16);
+}
+
+.admin-table td strong {
+  color: #FF5B2E;
+}
+
+.admin-table-actions {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.admin-table-actions button {
+  border: 1px solid rgba(255, 91, 46, 0.22);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: rgba(255, 91, 46, 0.1);
+  color: #FF5B2E;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-table-actions button:hover,
+.admin-table-actions button:focus-visible {
+  background: rgba(255, 91, 46, 0.16);
+}
+
+.admin-type-pill {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.admin-type-pill.admin {
+  color: #FF5B2E;
+  background: rgba(255, 91, 46, 0.12);
+}
+
+.admin-type-pill.store {
+  color: #000000;
+  background: rgba(255, 91, 46, 0.28);
+}
+
+.admin-type-pill.user {
+  color: #000000;
+  background: rgba(255, 91, 46, 0.12);
+}
+
+.admin-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.admin-detail-card {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(255, 91, 46, 0.12);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.84);
+  padding: 14px;
+}
+
+.admin-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-card-head h3,
+.admin-detail-card h4 {
+  margin: 0;
+}
+
+.admin-card-head p,
+.admin-contact-list p {
+  margin: 4px 0 0;
+  color: rgba(0, 0, 0, 0.68);
+  font-size: 13px;
+}
+
+.admin-card-head span {
+  height: fit-content;
+  border-radius: 999px;
+  padding: 5px 8px;
+  background: rgba(255, 91, 46, 0.24);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.admin-detail-card h4 {
+  color: #FF5B2E;
+  font-size: 13px;
+}
+
+.admin-mini-list {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-mini-list p {
+  margin: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 8px;
+  color: rgba(0, 0, 0, 0.75);
+  font-size: 13px;
+}
+
+.admin-mini-list span {
+  color: rgba(0, 0, 0, 0.64);
+  white-space: nowrap;
+}
+
+.admin-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-card-actions button {
+  border: 1px solid rgba(255, 91, 46, 0.22);
+  border-radius: 10px;
+  padding: 9px 11px;
+  background: rgba(255, 91, 46, 0.1);
+  color: #FF5B2E;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.admin-card-actions button:hover,
+.admin-card-actions button:focus-visible {
+  background: rgba(255, 91, 46, 0.16);
+}
+
+body.admin-modal-open {
+  overflow: hidden;
+}
+
+.admin-modal[hidden] {
+  display: none;
+}
+
+.admin-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.admin-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.58);
+}
+
+.admin-modal-panel {
+  position: relative;
+  z-index: 1;
+  width: min(760px, 100%);
+  max-height: min(76vh, 720px);
+  overflow: auto;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 91, 46, 0.18);
+  background: #ffffff;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.36);
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.admin-modal-head {
+  position: sticky;
+  top: -16px;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 2px 0 10px;
+  background: #ffffff;
+}
+
+.admin-modal-head h2 {
+  margin: 0;
+  color: #FF5B2E;
+}
+
+.admin-modal-head button {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(255, 91, 46, 0.22);
+  border-radius: 10px;
+  background: rgba(255, 91, 46, 0.1);
+  color: #FF5B2E;
+  cursor: pointer;
+  font: inherit;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.admin-muted-row {
+  justify-content: flex-start !important;
+  background: rgba(255, 255, 255, 0.74) !important;
+  color: rgba(0, 0, 0, 0.66) !important;
+}
+
+@media (max-width: 920px) {
+  .admin-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-map-panel,
+  #admin-map {
+    height: 48vh;
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-shell {
+    padding: 14px;
+  }
+
+  .admin-stat-grid,
+  .split {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-map-status {
+    border-radius: 12px;
+  }
+
+  .admin-modal {
+    padding: 10px;
+  }
+
+  .admin-modal-panel {
+    max-height: 86vh;
+    border-radius: 14px;
+  }
+}
