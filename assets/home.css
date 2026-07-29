@@ -1625,6 +1625,30 @@ body.menu-open .menu-backdrop {
   font-size: 24px;
   line-height: 1;
   cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.panel-close:hover {
+  background: rgba(255, 91, 46, 0.25);
+}
+
+.panel-close:active {
+  background: rgba(255, 91, 46, 0.35);
+}
+
+.map-marker.store-home {
+  background: #FF5B2E;
+  color: #000000;
+  border-color: #000000;
+  box-shadow: 0 0 0 3px rgba(255, 91, 46, 0.16), 0 12px 22px rgba(0, 0, 0, 0.28);
+}
+
+.map-marker.store-home:hover {
+  filter: brightness(0.85);
+}
+
+.map-marker.store-home:active {
+  filter: brightness(0.7);
 }
 
 .store-pin-status {
@@ -2074,4 +2098,38 @@ body.menu-open .menu-backdrop {
     grid-auto-columns: minmax(190px, 78vw);
     gap: 10px;
   }
+}
+
+.cart-toggle-btn:hover,
+.menu-toggle:hover,
+.cart-checkout-btn:hover,
+.store-product-row button:hover,
+.search-product-actions button[data-search-action="add-cart"]:hover {
+  filter: brightness(0.85);
+}
+
+.cart-toggle-btn:active,
+.menu-toggle:active,
+.cart-checkout-btn:active,
+.store-product-row button:active,
+.search-product-actions button[data-search-action="add-cart"]:active {
+  filter: brightness(0.7);
+}
+
+.carousel-btn:hover,
+.store-panel-minimize:hover,
+.search-product-actions button:not([data-search-action="add-cart"]):hover,
+.cart-qty-controls button:hover,
+.cart-clear-btn:hover:not(:disabled) {
+  background: rgba(255, 91, 46, 0.08);
+  border-color: rgba(255, 91, 46, 0.4);
+}
+
+.carousel-btn:active,
+.store-panel-minimize:active,
+.search-product-actions button:not([data-search-action="add-cart"]):active,
+.cart-qty-controls button:active,
+.cart-clear-btn:active:not(:disabled) {
+  background: rgba(255, 91, 46, 0.15);
+  border-color: rgba(255, 91, 46, 0.55);
 }

@@ -93,7 +93,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Profile</title>
     <link rel="stylesheet" href="../assets/styles.css?v=large-logo-1">
-    <link rel="stylesheet" href="../assets/store-admin.css?v=large-logo-1">
+    <link rel="stylesheet" href="../assets/store-admin.css?v=hover-effects-1">
     <link rel="stylesheet" href="assets/admin.css?v=large-logo-1">
 </head>
 <body class="store-admin-body admin-body">
