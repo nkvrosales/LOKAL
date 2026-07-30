@@ -923,6 +923,7 @@ body.menu-open .menu-backdrop {
   transform: translateY(-1px);
   border-color: rgba(255, 255, 255, 0.65);
   background: rgba(255, 255, 255, 0.16);
+  filter: brightness(0.85);
 }
 
 .menu-logout {
@@ -2104,32 +2105,68 @@ body.menu-open .menu-backdrop {
 .menu-toggle:hover,
 .cart-checkout-btn:hover,
 .store-product-row button:hover,
-.search-product-actions button[data-search-action="add-cart"]:hover {
-  filter: brightness(0.85);
+.search-product-actions button[data-search-action="add-cart"]:hover,
+.store-home-link:hover,
+.driver-action-btn:hover,
+.menu-close:hover,
+.driver-orders-empty:hover {
+  filter: brightness(0.92);
 }
 
 .cart-toggle-btn:active,
 .menu-toggle:active,
 .cart-checkout-btn:active,
 .store-product-row button:active,
-.search-product-actions button[data-search-action="add-cart"]:active {
-  filter: brightness(0.7);
+.search-product-actions button[data-search-action="add-cart"]:active,
+.store-home-link:active,
+.driver-action-btn:active,
+.menu-close:active,
+.driver-order-card:active {
+  filter: brightness(0.82);
+}
+
+.driver-order-card:hover {
+  background: rgba(255, 255, 255, 0.94);
 }
 
 .carousel-btn:hover,
 .store-panel-minimize:hover,
 .search-product-actions button:not([data-search-action="add-cart"]):hover,
 .cart-qty-controls button:hover,
-.cart-clear-btn:hover:not(:disabled) {
-  background: rgba(255, 91, 46, 0.08);
-  border-color: rgba(255, 91, 46, 0.4);
+.cart-clear-btn:hover:not(:disabled),
+.driver-order-actions button:hover {
+  background: rgba(255, 91, 46, 0.06);
+  border-color: rgba(255, 91, 46, 0.35);
 }
 
 .carousel-btn:active,
 .store-panel-minimize:active,
 .search-product-actions button:not([data-search-action="add-cart"]):active,
 .cart-qty-controls button:active,
-.cart-clear-btn:active:not(:disabled) {
-  background: rgba(255, 91, 46, 0.15);
-  border-color: rgba(255, 91, 46, 0.55);
+.cart-clear-btn:active:not(:disabled),
+.driver-order-actions button:active {
+  background: rgba(255, 91, 46, 0.12);
+  border-color: rgba(255, 91, 46, 0.5);
+}
+
+.driver-order-actions button[data-order-action="accept"]:hover,
+.driver-order-actions button[data-order-action="pickup"]:hover,
+.driver-order-actions button[data-order-action="complete"]:hover,
+.driver-panel-toggle:hover {
+  filter: brightness(0.9);
+}
+
+.driver-order-actions button[data-order-action="accept"]:active,
+.driver-order-actions button[data-order-action="pickup"]:active,
+.driver-order-actions button[data-order-action="complete"]:active,
+.driver-panel-toggle:active {
+  filter: brightness(0.8);
+}
+
+button[data-order-action="decline"]:hover {
+  background: rgba(255, 91, 46, 0.2);
+}
+
+button[data-order-action="decline"]:active {
+  background: rgba(255, 91, 46, 0.28);
 }
