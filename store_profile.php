@@ -108,11 +108,14 @@ $storeForCart["products"] = $products;
 </head>
 <body class="store-admin-body">
     <header class="top-bar">
-        <div class="logo">Lokal</div>
+        <a class="logo" href="home.php" style="text-decoration:none">Lokal</a>
         <nav class="store-admin-nav" aria-label="Store profile navigation">
             <a class="store-admin-tab" href="home.php">Home</a>
-            <a class="store-admin-tab" href="order_history.php">Orders</a>
             <a class="store-admin-tab" href="account_profile.php">Profile</a>
+            <a class="store-admin-tab" href="order_history.php">Orders</a>
+            <?php if (($_SESSION["account_type"] ?? "") !== "store"): ?>
+                <a class="store-admin-tab" href="cart.php">Cart</a>
+            <?php endif; ?>
             <a class="store-admin-tab" href="logout.php">Log out</a>
         </nav>
     </header>
@@ -232,19 +235,24 @@ $storeForCart["products"] = $products;
                 if (!Array.isArray(saved)) {
                     return [];
                 }
-                const currentStoreItems = saved.filter((item) => String(item.storeId || "") === String(store.id));
-                if (saved.length && currentStoreItems.length !== saved.length) {
-                    saveCart([]);
-                    return [];
-                }
-                return currentStoreItems;
+                return saved.filter((item) => String(item.storeId || "") === String(store.id));
             } catch (error) {
                 return [];
             }
         }
 
-        function saveCart(items) {
-            window.localStorage.setItem(cartStorageKey, JSON.stringify(items));
+        function saveCart(currentStoreItems) {
+            let all = [];
+            try {
+                all = JSON.parse(window.localStorage.getItem(cartStorageKey) || "[]");
+                if (!Array.isArray(all)) {
+                    all = [];
+                }
+            } catch (e) {
+                all = [];
+            }
+            const otherStoreItems = all.filter((item) => String(item.storeId || "") !== String(store.id));
+            window.localStorage.setItem(cartStorageKey, JSON.stringify(otherStoreItems.concat(currentStoreItems)));
         }
 
         function normalizeQuantity(value, fallback = 1) {
@@ -462,7 +470,20 @@ $storeForCart["products"] = $products;
             L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
                 attribution: "&copy; OpenStreetMap contributors"
             }).addTo(map);
-            L.marker([Number(store.lat), Number(store.lng)]).addTo(map).bindPopup(store.name || "Store").openPopup();
+            const storeIcon = L.divIcon({
+                className: "custom-marker",
+                html: `<div class="map-marker store">
+                        <svg class="marker-svg" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M3 9l2-5h14l2 5"></path>
+                            <path d="M5 9v11h14V9"></path>
+                            <path d="M9 20v-5h6v5"></path>
+                        </svg>
+                    </div>`,
+                iconSize: [34, 34],
+                iconAnchor: [17, 34],
+                popupAnchor: [0, -32]
+            });
+            L.marker([Number(store.lat), Number(store.lng)], { icon: storeIcon }).addTo(map).bindPopup(store.name || "Store").openPopup();
         } else {
             document.getElementById("public-store-map").innerHTML = "<p>Location not available.</p>";
         }

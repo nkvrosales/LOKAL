@@ -178,14 +178,6 @@ if (!$is_store) {
         </div>
 
         <?php if (!$is_store): ?>
-            <section class="product-search-shell" id="product-search-shell">
-                <label for="product-search-input">Search Product</label>
-                <input type="search" id="product-search-input" placeholder="Type product name..." autocomplete="off">
-                <div class="product-search-results" id="product-search-results">
-                    <p class="search-hint">Search a product to see available items.</p>
-                </div>
-            </section>
-
             <button type="button" class="cart-toggle-btn" id="cart-toggle" aria-controls="cart-panel" aria-expanded="false" aria-label="Toggle cart">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                     <circle cx="9" cy="20" r="1.8"></circle>
@@ -257,7 +249,6 @@ if (!$is_store) {
                     </div>
                     <div class="order-tracker-controls">
                         <button type="button" class="order-tracker-minimize" id="order-tracker-minimize" aria-label="Minimize tracker">Minimize</button>
-                        <button type="button" class="order-tracker-close" id="order-tracker-close" aria-label="Close tracker">&times;</button>
                     </div>
                 </div>
                 <div class="order-tracker-list" id="order-tracker-list"></div>
@@ -279,9 +270,9 @@ if (!$is_store) {
                     <button type="button" class="menu-link" id="menu-center-store-pin">Center to store pin</button>
                 <?php else: ?>
                     <a class="menu-link" href="account_profile.php">Profile</a>
+                    <a class="menu-link" href="cart.php">Cart</a>
                     <a class="menu-link" href="order_history.php">Orders</a>
-                    <button type="button" class="menu-link" id="menu-focus-stores">Focus all stores</button>
-                    <button type="button" class="menu-link" id="menu-jump-cards">Jump to store cards</button>
+
                 <?php endif; ?>
             </section>
 
@@ -295,63 +286,7 @@ if (!$is_store) {
 
         <div class="menu-backdrop" id="menu-backdrop"></div>
 
-        <?php if (!$is_store): ?>
-            <section class="store-carousel-panel" id="store-panel">
-                <div class="store-panel-head">
-                    <div>
-                        <h1>Store Cards</h1>
-                        <p><?php echo count($stores) ? "Swipe or use arrows to browse stores." : "No stores available yet."; ?></p>
-                    </div>
-                    <div class="store-panel-controls">
-                        <button type="button" class="carousel-btn store-panel-minimize" id="store-panel-minimize" aria-label="Minimize store cards" aria-expanded="true">&minus;</button>
-                        <button type="button" class="carousel-btn" id="carousel-prev" aria-label="Previous stores">&#8249;</button>
-                        <button type="button" class="carousel-btn" id="carousel-next" aria-label="Next stores">&#8250;</button>
-                    </div>
-                </div>
-
-                <div class="store-carousel" id="store-carousel">
-                    <?php if ($stores): ?>
-                        <?php foreach ($stores as $store): ?>
-                            <button
-                                type="button"
-                                class="store-card"
-                                data-store-id="<?php echo (int) $store["id"]; ?>"
-                                data-lat="<?php echo escape((string) $store["lat"]); ?>"
-                                data-lng="<?php echo escape((string) $store["lng"]); ?>"
-                                data-name="<?php echo escape($store["name"]); ?>"
-                            >
-                                <h2><?php echo escape($store["name"]); ?></h2>
-                                <p class="store-address"><?php echo escape($store["address"] !== "" ? $store["address"] : "Store location"); ?></p>
-                                <?php if ($store["contact"] !== ""): ?>
-                                    <p class="store-contact">Contact: <?php echo escape($store["contact"]); ?></p>
-                                <?php endif; ?>
-                                <?php if (!empty($store["products"])): ?>
-                                    <div class="store-products-preview">
-                                        <?php foreach (array_slice($store["products"], 0, 3) as $product): ?>
-                                            <?php
-                                                $line = $product["name"] !== "" ? $product["name"] : "Product";
-                                                if ($product["price_label"] !== "") {
-                                                    $line .= " - " . $product["price_label"];
-                                                }
-                                            ?>
-                                            <p class="store-product-line"><?php echo escape($line); ?></p>
-                                        <?php endforeach; ?>
-                                    </div>
-                                <?php else: ?>
-                                    <p class="store-products-empty">No products listed yet.</p>
-                                <?php endif; ?>
-                                <div class="store-search-matches" data-store-match-list hidden></div>
-                            </button>
-                        <?php endforeach; ?>
-                    <?php else: ?>
-                        <article class="store-card empty">
-                            <h2>No stores pinned yet</h2>
-                            <p class="store-address">Store cards will appear here once a store account pins a location.</p>
-                        </article>
-                    <?php endif; ?>
-                </div>
-            </section>
-        <?php else: ?>
+        <?php if ($is_store): ?>
             <section class="store-home-panel">
                 <h1>Store Home</h1>
                 <p>Use the menu to open Profile or Product. This page stays focused on the map.</p>
@@ -380,20 +315,6 @@ if (!$is_store) {
         const storeIcon = L.divIcon({
             className: "custom-marker",
             html: `<div class="map-marker store">
-                    <svg class="marker-svg" viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M3 9l2-5h14l2 5"></path>
-                        <path d="M5 9v11h14V9"></path>
-                        <path d="M9 20v-5h6v5"></path>
-                    </svg>
-                </div>`,
-            iconSize: [34, 34],
-            iconAnchor: [17, 34],
-            popupAnchor: [0, -32]
-        });
-
-        const storeMatchIcon = L.divIcon({
-            className: "custom-marker",
-            html: `<div class="map-marker store search-hit">
                     <svg class="marker-svg" viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M3 9l2-5h14l2 5"></path>
                         <path d="M5 9v11h14V9"></path>
@@ -454,7 +375,6 @@ if (!$is_store) {
         const menuToggle = document.getElementById("menu-toggle");
         const menuClose = document.getElementById("menu-close");
         const menuBackdrop = document.getElementById("menu-backdrop");
-        const menuJumpCards = document.getElementById("menu-jump-cards");
 
         function setStatus(message) {
             if (statusEl) {
@@ -502,36 +422,11 @@ if (!$is_store) {
             }
         });
 
-        if (menuJumpCards) {
-            menuJumpCards.addEventListener("click", () => {
-                const panel = document.getElementById("store-panel");
-                if (panel) {
-                    panel.classList.remove("pulse");
-                    void panel.offsetWidth;
-                    panel.classList.add("pulse");
-                    const firstCard = panel.querySelector(".store-card");
-                    if (firstCard) {
-                        firstCard.focus();
-                    }
-                }
-                closeMenu();
-            });
-        }
-
         if (!isStoreAccount) {
             const bounds = [];
             const userBounds = [];
             const markerByStoreId = new Map();
             const storeById = new Map(stores.map((store) => [String(store.id), store]));
-            const cards = Array.from(document.querySelectorAll(".store-card[data-store-id]"));
-            const carousel = document.getElementById("store-carousel");
-            const storePanel = document.getElementById("store-panel");
-            const storePanelMinimize = document.getElementById("store-panel-minimize");
-            const prevButton = document.getElementById("carousel-prev");
-            const nextButton = document.getElementById("carousel-next");
-            const focusStoresButton = document.getElementById("menu-focus-stores");
-            const searchInput = document.getElementById("product-search-input");
-            const searchResults = document.getElementById("product-search-results");
             const cartItemsEl = document.getElementById("cart-items");
             const cartCountEl = document.getElementById("cart-count");
             const cartToggleButton = document.getElementById("cart-toggle");
@@ -552,7 +447,6 @@ if (!$is_store) {
             const orderTrackerPanel = document.getElementById("order-tracker-panel");
             const orderTrackerSummary = document.getElementById("order-tracker-summary");
             const orderTrackerList = document.getElementById("order-tracker-list");
-            const orderTrackerClose = document.getElementById("order-tracker-close");
             const orderTrackerMinimize = document.getElementById("order-tracker-minimize");
             const orderTrackerBubble = document.getElementById("order-tracker-bubble");
             const orderTrackerBubbleCount = document.getElementById("order-tracker-bubble-count");
@@ -564,7 +458,7 @@ if (!$is_store) {
             let customerMarker = null;
             let customerRouteLayer = null;
             let activeTrackedOrderId = null;
-            let isOrderTrackerMinimized = false;
+            let isOrderTrackerMinimized = true;
 
             const hasUserHomePin = userHomePin
                 && Number.isFinite(Number(userHomePin.lat))
@@ -577,7 +471,11 @@ if (!$is_store) {
                     : "Your saved location";
                 L.marker([userLat, userLng], { icon: customerIcon })
                     .addTo(map)
-                    .bindPopup(`<strong>Your Location</strong><br>${address}`);
+                    .bindTooltip(`<strong>Your Location</strong><br>${address}`, {
+                        direction: "top",
+                        offset: [0, -35],
+                        opacity: 0.96
+                    });
                 userBounds.push([userLat, userLng]);
             }
 
@@ -586,7 +484,12 @@ if (!$is_store) {
                 const name = escapeHtml(store.name && store.name !== "" ? store.name : "Store");
                 const address = escapeHtml(store.address && store.address !== "" ? store.address : "Store location");
                 const contact = store.contact && store.contact !== "" ? `<br>Contact: ${escapeHtml(store.contact)}` : "";
-                marker.bindPopup(`<strong>${name}</strong><br>${address}${contact}<br><a href="store_profile.php?id=${encodeURIComponent(store.id)}">Open store profile</a>`);
+                marker.bindTooltip(`<strong>${name}</strong><br>${address}${contact}`, {
+                    direction: "top",
+                    offset: [0, -35],
+                    opacity: 0.96
+                });
+                marker.on("click", () => openStoreProfile(store.id));
                 markerByStoreId.set(String(store.id), marker);
                 bounds.push([store.lat, store.lng]);
             });
@@ -605,18 +508,10 @@ if (!$is_store) {
                 setStatus("No store markers available.");
             }
 
-            function setActiveCard(activeCard) {
-                cards.forEach((card) => card.classList.toggle("active", card === activeCard));
-            }
-
             function focusStore(storeId) {
                 const marker = markerByStoreId.get(storeId);
                 if (!marker) {
                     return;
-                }
-                const activeCard = cards.find((card) => (card.dataset.storeId || "") === storeId);
-                if (activeCard) {
-                    setActiveCard(activeCard);
                 }
                 map.flyTo(marker.getLatLng(), 16, { duration: 0.55 });
                 marker.openPopup();
@@ -627,17 +522,6 @@ if (!$is_store) {
                     return;
                 }
                 window.location.href = `store_profile.php?id=${encodeURIComponent(storeId)}`;
-            }
-
-            function getProductMatches(store, queryLower) {
-                if (!Array.isArray(store.products) || !store.products.length) {
-                    return [];
-                }
-                return store.products.filter((product) => {
-                    const name = String(product.name || "").toLowerCase();
-                    const description = String(product.description || "").toLowerCase();
-                    return name.includes(queryLower) || description.includes(queryLower);
-                });
             }
 
             function findStoreProduct(storeId, productId) {
@@ -666,22 +550,6 @@ if (!$is_store) {
                     input.value = String(quantity);
                 }
                 return quantity;
-            }
-
-            function getCartStoreId() {
-                const first = cart.values().next();
-                return first.done ? "" : String(first.value.storeId || "");
-            }
-
-            function resetCartForDifferentStore(storeId) {
-                const currentStoreId = getCartStoreId();
-                if (currentStoreId !== "" && currentStoreId !== String(storeId)) {
-                    cart.clear();
-                    saveCart();
-                    renderCart();
-                    return true;
-                }
-                return false;
             }
 
             function formatCartPrice(value) {
@@ -896,6 +764,7 @@ if (!$is_store) {
                 orderTrackerList.innerHTML = orders.map((order) => {
                     const items = Array.isArray(order.items) ? order.items : [];
                     const lines = items.map((item) => `<p>${escapeHtml(item.product_name)} x ${Number(item.quantity || 0)}</p>`).join("");
+                    const total = order.total_amount != null ? formatCartPrice(order.total_amount) : "";
                     return `<article class="order-tracker-card ${activeTrackedOrderId === order.id ? "active" : ""}" data-order-id="${order.id}">
                                 <div class="order-tracker-card-head">
                                     <strong>Order #${order.id}</strong>
@@ -903,6 +772,7 @@ if (!$is_store) {
                                 </div>
                                 <p>Store: ${escapeHtml(order.store_name || "Store")}</p>
                                 <div class="order-tracker-items">${lines || "<p>No items listed.</p>"}</div>
+                                ${total ? `<p><strong>${total}</strong></p>` : ""}
                             </article>`;
                 }).join("");
 
@@ -1045,17 +915,13 @@ if (!$is_store) {
                     return;
                 }
 
-                const didResetCart = resetCartForDifferentStore(found.store.id);
                 const key = `${found.store.id}:${found.product.id}`;
                 const current = cart.get(key);
                 const amount = normalizeQuantity(quantity);
                 const currentQuantity = current ? normalizeQuantity(current.quantity) : 0;
                 const nextQuantity = Math.min(99, currentQuantity + amount);
                 updateCartItem(found.store.id, found.product.id, nextQuantity);
-                if (openCart) {
-                    setCartPanelOpen(true);
-                }
-                setStatus(`${didResetCart ? "Cart reset for this store. " : ""}${found.product.name || "Product"} quantity in cart: ${nextQuantity}.`);
+                setStatus(`${found.product.name || "Product"} quantity in cart: ${nextQuantity}.`);
             }
 
             function getCurrentLocation() {
@@ -1180,219 +1046,6 @@ if (!$is_store) {
                 setStatus(`Showing products from ${store.name || "store"}.`);
             }
 
-            function renderCardMatches(card, matchedProducts) {
-                const matchList = card.querySelector("[data-store-match-list]");
-                if (!matchList) {
-                    return;
-                }
-                if (!matchedProducts.length) {
-                    matchList.hidden = true;
-                    matchList.innerHTML = "";
-                    return;
-                }
-
-                const lines = matchedProducts.slice(0, 4).map((product) => {
-                    const productName = escapeHtml(product.name && product.name !== "" ? product.name : "Product");
-                    const productPrice = product.price_label && product.price_label !== "" ? ` <span>${escapeHtml(product.price_label)}</span>` : "";
-                    return `<p class="store-search-line">${productName}${productPrice}</p>`;
-                }).join("");
-                const moreCount = matchedProducts.length > 4 ? `<p class="store-search-line more">+${matchedProducts.length - 4} more</p>` : "";
-
-                matchList.innerHTML = `<p class="store-search-title">Matched products</p>${lines}${moreCount}`;
-                matchList.hidden = false;
-            }
-
-            function renderSearchResults(query, matchedRows) {
-                if (!searchResults) {
-                    return;
-                }
-                if (query === "") {
-                    searchResults.innerHTML = `<p class="search-hint">Search a product to see available items.</p>`;
-                    return;
-                }
-                if (!matchedRows.length) {
-                    searchResults.innerHTML = `<p class="search-empty">No product found for "${escapeHtml(query)}".</p>`;
-                    return;
-                }
-
-                const productRows = matchedRows.flatMap((row) => row.matches.map((product) => ({
-                    store: row.store,
-                    product
-                })));
-
-                const resultsHtml = productRows.map((row) => {
-                    const productName = row.product.name && row.product.name !== "" ? row.product.name : "Product";
-                    const productPrice = row.product.price_label && row.product.price_label !== "" ? row.product.price_label : "Price not set";
-                    const productDescription = row.product.description && row.product.description !== ""
-                        ? `<p class="search-product-description">${escapeHtml(row.product.description)}</p>`
-                        : "";
-                    return `<article class="search-result-item">
-                                <div class="search-product-copy">
-                                    <strong>${escapeHtml(productName)}</strong>
-                                    <span>${escapeHtml(productPrice)}</span>
-                                    ${productDescription}
-                                    <p class="search-store-line">${escapeHtml(row.store.name)} - ${escapeHtml(row.store.address && row.store.address !== "" ? row.store.address : "Store location")}</p>
-                                </div>
-                                <div class="search-product-actions">
-                                    <button type="button" data-search-action="focus-store" data-store-id="${row.store.id}">View store</button>
-                                    <label class="product-quantity-control">
-                                        <span>Qty</span>
-                                        <input type="number" min="1" max="99" value="1" inputmode="numeric" data-cart-quantity>
-                                    </label>
-                                    <button type="button" data-search-action="add-cart" data-store-id="${row.store.id}" data-product-id="${row.product.id}">Add</button>
-                                </div>
-                            </article>`;
-                }).join("");
-
-                searchResults.innerHTML = resultsHtml;
-                searchResults.querySelectorAll("[data-search-action]").forEach((button) => {
-                    button.addEventListener("click", () => {
-                        const action = button.dataset.searchAction || "";
-                        const storeId = button.dataset.storeId || "";
-                        if (action === "focus-store") {
-                            openStoreProfile(storeId);
-                            return;
-                        }
-                        if (action === "add-cart") {
-                            addProductToCart(
-                                storeId,
-                                button.dataset.productId || "",
-                                getRequestedQuantity(button),
-                                true
-                            );
-                        }
-                    });
-                });
-            }
-
-            function applyProductSearch(queryValue) {
-                const rawQuery = String(queryValue || "").trim();
-                const queryLower = rawQuery.toLowerCase();
-                const matchedBounds = [];
-                const matchedRows = [];
-                let matchedStoreCount = 0;
-                let matchedProductCount = 0;
-
-                cards.forEach((card) => {
-                    const storeId = card.dataset.storeId || "";
-                    const marker = markerByStoreId.get(storeId);
-                    const store = storeById.get(storeId);
-                    if (!marker || !store) {
-                        return;
-                    }
-
-                    if (rawQuery === "") {
-                        marker.setIcon(storeIcon);
-                        card.classList.remove("search-hit", "search-dim");
-                        renderCardMatches(card, []);
-                        return;
-                    }
-
-                    const matches = getProductMatches(store, queryLower);
-                    if (matches.length) {
-                        marker.setIcon(storeMatchIcon);
-                        card.classList.add("search-hit");
-                        card.classList.remove("search-dim");
-                        matchedBounds.push([store.lat, store.lng]);
-                        matchedRows.push({ store, matches });
-                        matchedStoreCount += 1;
-                        matchedProductCount += matches.length;
-                        renderCardMatches(card, matches);
-                    } else {
-                        marker.setIcon(storeIcon);
-                        card.classList.remove("search-hit");
-                        card.classList.add("search-dim");
-                        renderCardMatches(card, []);
-                    }
-                });
-
-                if (rawQuery === "") {
-                    renderSearchResults("", []);
-                    if (bounds.length) {
-                        setStatus(`${bounds.length} stores available.`);
-                    } else {
-                        setStatus("No store markers available.");
-                    }
-                    return;
-                }
-
-                if (matchedBounds.length > 1) {
-                    map.fitBounds(matchedBounds, {
-                        paddingTopLeft: [42, 110],
-                        paddingBottomRight: [42, 260]
-                    });
-                } else if (matchedBounds.length === 1) {
-                    map.flyTo(matchedBounds[0], 16, { duration: 0.45 });
-                }
-
-                renderSearchResults(rawQuery, matchedRows);
-                if (matchedStoreCount > 0) {
-                    setStatus(`Found ${matchedProductCount} matching product(s) in ${matchedStoreCount} store(s).`);
-                } else {
-                    setStatus(`No store has "${rawQuery}".`);
-                }
-            }
-
-            cards.forEach((card) => {
-                card.addEventListener("click", () => {
-                    const storeId = card.dataset.storeId || "";
-                    openStoreProfile(storeId);
-                });
-            });
-
-            function scrollCards(direction) {
-                if (!carousel) {
-                    return;
-                }
-                const firstCard = carousel.querySelector(".store-card");
-                if (!firstCard) {
-                    return;
-                }
-                const styles = getComputedStyle(carousel);
-                const gap = Number.parseInt(styles.columnGap || styles.gap || "0", 10) || 0;
-                const width = firstCard.getBoundingClientRect().width + gap;
-                carousel.scrollBy({ left: direction * width, behavior: "smooth" });
-            }
-
-            if (prevButton) {
-                prevButton.addEventListener("click", () => scrollCards(-1));
-            }
-            if (nextButton) {
-                nextButton.addEventListener("click", () => scrollCards(1));
-            }
-            if (storePanel && storePanelMinimize) {
-                storePanelMinimize.addEventListener("click", () => {
-                    const isMinimized = storePanel.classList.toggle("is-minimized");
-                    storePanelMinimize.setAttribute("aria-expanded", isMinimized ? "false" : "true");
-                    storePanelMinimize.setAttribute("aria-label", isMinimized ? "Show store cards" : "Minimize store cards");
-                    storePanelMinimize.innerHTML = isMinimized ? "View Stores" : "&minus;";
-                });
-            }
-            if (focusStoresButton) {
-                focusStoresButton.addEventListener("click", () => {
-                    if (bounds.length) {
-                        map.fitBounds(bounds, {
-                            paddingTopLeft: [42, 95],
-                            paddingBottomRight: [42, 260]
-                        });
-                        setStatus("Showing all store markers.");
-                    }
-                    closeMenu();
-                });
-            }
-
-            if (searchInput) {
-                searchInput.addEventListener("input", () => {
-                    applyProductSearch(searchInput.value);
-                });
-                searchInput.addEventListener("keydown", (event) => {
-                    if (event.key === "Escape") {
-                        searchInput.value = "";
-                        applyProductSearch("");
-                    }
-                });
-            }
-
             if (cartItemsEl) {
                 cartItemsEl.addEventListener("click", (event) => {
                     const button = event.target.closest("[data-cart-action]");
@@ -1443,7 +1096,7 @@ if (!$is_store) {
 
             if (cartToggleButton) {
                 cartToggleButton.addEventListener("click", () => {
-                    setCartPanelOpen(cartPanel ? cartPanel.hidden : true);
+                    window.location.href = "cart.php";
                 });
             }
 
@@ -1472,17 +1125,6 @@ if (!$is_store) {
                         getRequestedQuantity(button),
                         true
                     );
-                });
-            }
-
-            if (orderTrackerClose && orderTrackerPanel) {
-                orderTrackerClose.addEventListener("click", () => {
-                    isOrderTrackerMinimized = true;
-                    orderTrackerPanel.hidden = true;
-                    if (orderTrackerBubble) {
-                        orderTrackerBubble.hidden = false;
-                        orderTrackerBubble.setAttribute("aria-expanded", "false");
-                    }
                 });
             }
 
@@ -1519,7 +1161,6 @@ if (!$is_store) {
 
             loadSavedCart();
             renderCart();
-            applyProductSearch("");
             refreshUserOrders();
             orderPollTimer = window.setInterval(refreshUserOrders, 10000);
         } else {

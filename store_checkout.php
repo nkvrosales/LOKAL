@@ -78,9 +78,9 @@ if ($userStmt) {
 </head>
 <body class="store-admin-body">
     <header class="top-bar">
-        <div class="logo">Checkout</div>
+        <a class="logo" href="home.php" style="text-decoration:none">Lokal</a>
         <nav class="store-admin-nav" aria-label="Checkout navigation">
-            <a class="store-admin-tab" href="store_profile.php?id=<?php echo (int) $store["id"]; ?>">Proceed to store</a>
+            <a class="store-admin-tab" href="store_profile.php?id=<?php echo (int) $store["id"]; ?>">Back to store</a>
             <a class="store-admin-tab" href="home.php">Home</a>
         </nav>
     </header>
@@ -88,7 +88,7 @@ if ($userStmt) {
     <main class="public-store-shell checkout-page-shell">
         <section class="public-store-head">
             <div>
-                <a class="back-link" href="store_profile.php?id=<?php echo (int) $store["id"]; ?>">Proceed to store</a>
+                <a class="back-link" href="store_profile.php?id=<?php echo (int) $store["id"]; ?>">Back to store</a>
                 <h1>Checkout</h1>
                 <p><?php echo escape($store["name"]); ?></p>
             </div>
@@ -135,7 +135,7 @@ if ($userStmt) {
 
                 <div class="checkout-page-actions">
                     <button type="button" class="btn" id="place-order">Place order</button>
-                    <a class="btn checkout-secondary" href="store_profile.php?id=<?php echo (int) $store["id"]; ?>">Proceed to store</a>
+                    <a class="btn checkout-secondary" href="store_profile.php?id=<?php echo (int) $store["id"]; ?>">Back to store</a>
                 </div>
             </article>
         </section>

@@ -126,13 +126,15 @@ function format_order_type(string $type): string
 </head>
 <body class="store-admin-body">
     <header class="top-bar">
-        <div class="logo">Lokal Orders</div>
+        <a class="logo" href="home.php" style="text-decoration:none">Lokal</a>
         <nav class="store-admin-nav" aria-label="Account pages">
             <a class="store-admin-tab" href="home.php">Home</a>
             <a class="store-admin-tab" href="account_profile.php">Profile</a>
             <a class="store-admin-tab active" href="order_history.php">Orders</a>
             <?php if ($isStore): ?>
                 <a class="store-admin-tab" href="store_products.php">Product</a>
+            <?php else: ?>
+                <a class="store-admin-tab" href="cart.php">Cart</a>
             <?php endif; ?>
             <a class="store-admin-tab" href="logout.php">Log out</a>
         </nav>
