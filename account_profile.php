@@ -14,43 +14,45 @@ $errors = [];
 $notice = "";
 
 $profile = [
-    "first_name" => "",
-    "middle_name" => "",
-    "last_name" => "",
-    "contact" => "",
-    "email" => "",
-    "user_address" => "",
-    "user_lat" => "",
-    "user_lng" => "",
-    "store_name" => "",
-    "store_contact" => "",
-    "store_address" => "",
-    "store_lat" => "",
-    "store_lng" => "",
+    "first_name"     => "",
+    "middle_name"    => "",
+    "last_name"      => "",
+    "contact"        => "",
+    "email"          => "",
+    "user_address"   => "",
+    "user_lat"       => "",
+    "user_lng"       => "",
+    "store_name"     => "",
+    "store_contact"  => "",
+    "store_address"  => "",
+    "store_lat"      => "",
+    "store_lng"      => "",
+    "store_category" => "",
 ];
 
 function load_account_profile(mysqli $mysqli, int $userId): array
 {
     $profile = [
-        "first_name" => "",
-        "middle_name" => "",
-        "last_name" => "",
-        "contact" => "",
-        "email" => "",
-        "user_address" => "",
-        "user_lat" => "",
-        "user_lng" => "",
-        "store_name" => "",
-        "store_contact" => "",
-        "store_address" => "",
-        "store_lat" => "",
-        "store_lng" => "",
+        "first_name"     => "",
+        "middle_name"    => "",
+        "last_name"      => "",
+        "contact"        => "",
+        "email"          => "",
+        "user_address"   => "",
+        "user_lat"       => "",
+        "user_lng"       => "",
+        "store_name"     => "",
+        "store_contact"  => "",
+        "store_address"  => "",
+        "store_lat"      => "",
+        "store_lng"      => "",
+        "store_category" => "",
     ];
 
     $stmt = $mysqli->prepare(
         "SELECT first_name, middle_name, last_name, contact, email,
                 user_address, user_lat, user_lng,
-                store_name, store_contact, store_address, store_lat, store_lng
+                store_name, store_contact, store_address, store_lat, store_lng, store_category
          FROM users
          WHERE id = ?
          LIMIT 1"
@@ -74,23 +76,25 @@ function load_account_profile(mysqli $mysqli, int $userId): array
         $storeContact,
         $storeAddress,
         $storeLat,
-        $storeLng
+        $storeLng,
+        $storeCategory
     );
     if ($stmt->fetch()) {
         $profile = [
-            "first_name" => trim((string) ($firstName ?? "")),
-            "middle_name" => trim((string) ($middleName ?? "")),
-            "last_name" => trim((string) ($lastName ?? "")),
-            "contact" => trim((string) ($contact ?? "")),
-            "email" => trim((string) ($email ?? "")),
-            "user_address" => trim((string) ($userAddress ?? "")),
-            "user_lat" => $userLat !== null ? (string) $userLat : "",
-            "user_lng" => $userLng !== null ? (string) $userLng : "",
-            "store_name" => trim((string) ($storeName ?? "")),
-            "store_contact" => trim((string) ($storeContact ?? "")),
-            "store_address" => trim((string) ($storeAddress ?? "")),
-            "store_lat" => $storeLat !== null ? (string) $storeLat : "",
-            "store_lng" => $storeLng !== null ? (string) $storeLng : "",
+            "first_name"     => trim((string) ($firstName ?? "")),
+            "middle_name"    => trim((string) ($middleName ?? "")),
+            "last_name"      => trim((string) ($lastName ?? "")),
+            "contact"        => trim((string) ($contact ?? "")),
+            "email"          => trim((string) ($email ?? "")),
+            "user_address"   => trim((string) ($userAddress ?? "")),
+            "user_lat"       => $userLat !== null ? (string) $userLat : "",
+            "user_lng"       => $userLng !== null ? (string) $userLng : "",
+            "store_name"     => trim((string) ($storeName ?? "")),
+            "store_contact"  => trim((string) ($storeContact ?? "")),
+            "store_address"  => trim((string) ($storeAddress ?? "")),
+            "store_lat"      => $storeLat !== null ? (string) $storeLat : "",
+            "store_lng"      => $storeLng !== null ? (string) $storeLng : "",
+            "store_category" => trim((string) ($storeCategory ?? "")),
         ];
     }
     $stmt->close();
@@ -111,7 +115,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $shouldChangePassword = $newPassword !== "" || $confirmPassword !== "";
 
     if ($isStore) {
-        foreach (["store_name", "store_contact", "store_address", "store_lat", "store_lng"] as $field) {
+        foreach (["store_name", "store_contact", "store_address", "store_lat", "store_lng", "store_category"] as $field) {
             $profile[$field] = trim($_POST[$field] ?? "");
         }
     } else {
@@ -196,15 +200,34 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         if ($isStore) {
             $lat = (float) $profile["store_lat"];
             $lng = (float) $profile["store_lng"];
+            $storeCat = $profile["store_category"] !== "" ? $profile["store_category"] : null;
             $stmt = $mysqli->prepare(
                 "UPDATE users
                  SET first_name = ?, middle_name = ?, last_name = ?, contact = ?, email = ?,
-                     store_name = ?, store_contact = ?, store_address = ?, store_lat = ?, store_lng = ?
+                     store_name = ?, store_contact = ?, store_address = ?, store_lat = ?, store_lng = ?,
+                     store_category = ?
                      {$passwordSql}
                  WHERE id = ?"
             );
             if ($stmt) {
                 if ($shouldChangePassword) {
+                    $stmt->bind_param(
+                        "ssssssssddssi",
+                        $profile["first_name"],
+                        $profile["middle_name"],
+                        $profile["last_name"],
+                        $profile["contact"],
+                        $profile["email"],
+                        $profile["store_name"],
+                        $profile["store_contact"],
+                        $profile["store_address"],
+                        $lat,
+                        $lng,
+                        $storeCat,
+                        $newHash,
+                        $userId
+                    );
+                } else {
                     $stmt->bind_param(
                         "ssssssssddsi",
                         $profile["first_name"],
@@ -217,22 +240,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         $profile["store_address"],
                         $lat,
                         $lng,
-                        $newHash,
-                        $userId
-                    );
-                } else {
-                    $stmt->bind_param(
-                        "ssssssssddi",
-                        $profile["first_name"],
-                        $profile["middle_name"],
-                        $profile["last_name"],
-                        $profile["contact"],
-                        $profile["email"],
-                        $profile["store_name"],
-                        $profile["store_contact"],
-                        $profile["store_address"],
-                        $lat,
-                        $lng,
+                        $storeCat,
                         $userId
                     );
                 }
@@ -294,6 +302,16 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
 $mapLat = $isStore ? $profile["store_lat"] : $profile["user_lat"];
 $mapLng = $isStore ? $profile["store_lng"] : $profile["user_lng"];
+
+// Fetch active categories for profile dropdown
+$prof_categories = [];
+$pcat = $mysqli->query("SELECT name, slug FROM categories WHERE is_active = 1 ORDER BY sort_order ASC, name ASC");
+if ($pcat) {
+    while ($pc = $pcat->fetch_assoc()) {
+        $prof_categories[] = ["name" => $pc["name"], "slug" => $pc["slug"]];
+    }
+    $pcat->close();
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -370,6 +388,17 @@ $mapLng = $isStore ? $profile["store_lng"] : $profile["user_lng"];
                     <div class="field">
                         <label for="store_contact">Store contact</label>
                         <input type="text" id="store_contact" name="store_contact" value="<?php echo escape($profile["store_contact"]); ?>" required>
+                    </div>
+                    <div class="field">
+                        <label for="store_category">Store category</label>
+                        <select id="store_category" name="store_category" style="height:44px;padding:0 12px;border:1px solid rgba(255,91,46,.22);border-radius:10px;font-size:13.5px;outline:none;width:100%;background:#fff;box-sizing:border-box;">
+                            <option value="">&mdash; Select a category &mdash;</option>
+                            <?php foreach ($prof_categories as $pc): ?>
+                                <option value="<?php echo escape($pc['slug']); ?>" <?php echo $profile['store_category'] === $pc['slug'] ? 'selected' : ''; ?>>
+                                    <?php echo escape($pc['name']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
                     <div class="field">
                         <label for="store_address">Store address</label>

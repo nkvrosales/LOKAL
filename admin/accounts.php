@@ -67,10 +67,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 $hash
             );
             if ($stmt->execute()) {
-                $notice = "Admin account created.";
-                foreach ($newAdmin as $field => $_) {
-                    $newAdmin[$field] = "";
-                }
+                header("Location: accounts.php?notice=" . urlencode("Admin account created."));
+                exit;
             } else {
                 $errors[] = "Unable to create admin account.";
             }
@@ -82,6 +80,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 }
 
 $accounts = admin_fetch_accounts($mysqli);
+$notice = $notice !== "" ? $notice : htmlspecialchars(urldecode($_GET["notice"] ?? ""));
+$showAddModal = !empty($errors);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -93,6 +93,26 @@ $accounts = admin_fetch_accounts($mysqli);
     <link rel="stylesheet" href="../assets/styles.css?v=large-logo-1">
     <link rel="stylesheet" href="../assets/store-admin.css?v=hover-effects-1">
     <link rel="stylesheet" href="assets/admin.css?v=large-logo-1">
+    <style>
+        .acct-modal-backdrop { position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:900;display:flex;align-items:center;justify-content:center; }
+        .acct-modal-backdrop[hidden] { display:none !important; }
+        .acct-modal-panel { background:#fff;border-radius:18px;padding:26px 28px;width:min(520px,94vw);display:grid;gap:14px;position:relative; }
+        .acct-modal-panel h2 { margin:0;font-family:"Cinzel","Georgia",serif;font-size:17px;color:#FF5B2E; }
+        .acct-field { display:grid;gap:4px; }
+        .acct-field label { font-size:12px;font-weight:600;color:rgba(0,0,0,.6); }
+        .acct-field input { height:42px;padding:0 13px;border:1px solid rgba(255,91,46,.22);border-radius:10px;font-size:13.5px;outline:none;width:100%;box-sizing:border-box;transition:border-color .15s; }
+        .acct-field input:focus { border-color:#FF5B2E; }
+        .acct-split { display:grid;grid-template-columns:1fr 1fr;gap:10px; }
+        .acct-modal-actions { display:flex;gap:10px;justify-content:flex-end;margin-top:4px; }
+        .acct-modal-close { position:absolute;top:14px;right:14px;width:30px;height:30px;border:0;border-radius:8px;background:rgba(0,0,0,.06);cursor:pointer;font-size:17px;display:flex;align-items:center;justify-content:center;color:rgba(0,0,0,.55); }
+        .acct-modal-close:hover { background:rgba(0,0,0,.12); }
+        .acct-btn-save { height:40px;padding:0 22px;background:#FF5B2E;color:#fff;border:0;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;transition:background .15s; }
+        .acct-btn-save:hover { background:#e04a1f; }
+        .acct-btn-cancel { height:40px;padding:0 18px;background:rgba(0,0,0,.07);color:rgba(0,0,0,.7);border:0;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer; }
+        .acct-btn-cancel:hover { background:rgba(0,0,0,.12); }
+        .acct-btn-add { height:38px;padding:0 20px;background:#FF5B2E;color:#fff;border:0;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;transition:background .15s; }
+        .acct-btn-add:hover { background:#e04a1f; }
+    </style>
 </head>
 <body class="store-admin-body admin-body">
     <header class="top-bar">
@@ -103,62 +123,20 @@ $accounts = admin_fetch_accounts($mysqli);
     </header>
 
     <main class="admin-shell">
-        <section class="admin-section">
+        <section class="admin-section" style="padding:24px 22px;display:grid;gap:20px;">
             <div class="admin-section-head">
                 <div>
                     <h1>User Management</h1>
                     <p>All store, user, and admin accounts are listed here. This page only creates admin accounts.</p>
+                </div>
+                <div>
+                    <button type="button" class="acct-btn-add" onclick="openAddAdminModal()">+ Add Admin</button>
                 </div>
             </div>
 
             <?php if ($notice !== ""): ?>
                 <div class="notice success"><?php echo escape($notice); ?></div>
             <?php endif; ?>
-            <?php if ($errors): ?>
-                <div class="notice error">
-                    <?php foreach ($errors as $error): ?>
-                        <div><?php echo escape($error); ?></div>
-                    <?php endforeach; ?>
-                </div>
-            <?php endif; ?>
-
-            <form method="post" class="admin-add-form">
-                <div class="split">
-                    <div class="field">
-                        <label for="first_name">First name</label>
-                        <input type="text" id="first_name" name="first_name" value="<?php echo escape($newAdmin["first_name"]); ?>" required>
-                    </div>
-                    <div class="field">
-                        <label for="middle_name">Middle name</label>
-                        <input type="text" id="middle_name" name="middle_name" value="<?php echo escape($newAdmin["middle_name"]); ?>" required>
-                    </div>
-                    <div class="field">
-                        <label for="last_name">Last name</label>
-                        <input type="text" id="last_name" name="last_name" value="<?php echo escape($newAdmin["last_name"]); ?>" required>
-                    </div>
-                </div>
-                <div class="split">
-                    <div class="field">
-                        <label for="contact">Contact</label>
-                        <input type="text" id="contact" name="contact" value="<?php echo escape($newAdmin["contact"]); ?>" required>
-                    </div>
-                    <div class="field">
-                        <label for="email">Email</label>
-                        <input type="email" id="email" name="email" value="<?php echo escape($newAdmin["email"]); ?>" required>
-                    </div>
-                </div>
-                <div class="split">
-                    <div class="field">
-                        <label for="password">Password</label>
-                        <input type="password" id="password" name="password" required>
-                    </div>
-                    <div class="field">
-                        <label for="confirm_password">Confirm password</label>
-                        <input type="password" id="confirm_password" name="confirm_password" required>
-                    </div>
-                </div>
-                <button class="btn" type="submit">Add Admin</button>
-            </form>
 
             <div class="admin-table-wrap">
                 <table class="admin-table">
@@ -187,5 +165,70 @@ $accounts = admin_fetch_accounts($mysqli);
             </div>
         </section>
     </main>
+
+    <!-- ── Add Admin Modal ─────────────────────────────────────────────────── -->
+    <div id="add-admin-modal" class="acct-modal-backdrop" <?php echo !empty($errors) ? '' : 'hidden'; ?>>
+        <div class="acct-modal-panel" role="dialog" aria-modal="true" aria-labelledby="add-admin-title">
+            <button type="button" class="acct-modal-close" onclick="closeAddAdminModal()" aria-label="Close">&times;</button>
+            <h2 id="add-admin-title">Add Admin Account</h2>
+            <?php if ($errors): ?>
+                <div class="notice error" style="margin:0;">
+                    <?php foreach ($errors as $error): ?>
+                        <div><?php echo escape($error); ?></div>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+            <form method="post" autocomplete="off">
+                <div style="display:grid;gap:12px;">
+                    <div class="acct-split">
+                        <div class="acct-field">
+                            <label for="first_name">First name <span style="color:#FF5B2E">*</span></label>
+                            <input type="text" id="first_name" name="first_name" value="<?php echo escape($newAdmin['first_name']); ?>" required>
+                        </div>
+                        <div class="acct-field">
+                            <label for="middle_name">Middle name <span style="color:#FF5B2E">*</span></label>
+                            <input type="text" id="middle_name" name="middle_name" value="<?php echo escape($newAdmin['middle_name']); ?>" required>
+                        </div>
+                    </div>
+                    <div class="acct-field">
+                        <label for="last_name">Last name <span style="color:#FF5B2E">*</span></label>
+                        <input type="text" id="last_name" name="last_name" value="<?php echo escape($newAdmin['last_name']); ?>" required>
+                    </div>
+                    <div class="acct-split">
+                        <div class="acct-field">
+                            <label for="contact">Contact <span style="color:#FF5B2E">*</span></label>
+                            <input type="text" id="contact" name="contact" value="<?php echo escape($newAdmin['contact']); ?>" required>
+                        </div>
+                        <div class="acct-field">
+                            <label for="email">Email <span style="color:#FF5B2E">*</span></label>
+                            <input type="email" id="email" name="email" value="<?php echo escape($newAdmin['email']); ?>" required>
+                        </div>
+                    </div>
+                    <div class="acct-split">
+                        <div class="acct-field">
+                            <label for="password">Password <span style="color:#FF5B2E">*</span></label>
+                            <input type="password" id="password" name="password" required>
+                        </div>
+                        <div class="acct-field">
+                            <label for="confirm_password">Confirm password <span style="color:#FF5B2E">*</span></label>
+                            <input type="password" id="confirm_password" name="confirm_password" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="acct-modal-actions">
+                    <button type="button" class="acct-btn-cancel" onclick="closeAddAdminModal()">Cancel</button>
+                    <button type="submit" class="acct-btn-save">Create Admin</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const addAdminModal = document.getElementById("add-admin-modal");
+        function openAddAdminModal()  { addAdminModal.hidden = false; document.getElementById("first_name").focus(); }
+        function closeAddAdminModal() { addAdminModal.hidden = true; }
+        addAdminModal.addEventListener("click", e => { if (e.target === addAdminModal) closeAddAdminModal(); });
+        document.addEventListener("keydown", e => { if (e.key === "Escape") closeAddAdminModal(); });
+    </script>
 </body>
 </html>

@@ -90,6 +90,7 @@ function ensure_users_schema(mysqli $mysqli): void
         "user_lng" => "ALTER TABLE users ADD COLUMN user_lng DECIMAL(10, 7) DEFAULT NULL AFTER user_lat",
         "password_reset_token" => "ALTER TABLE users ADD COLUMN password_reset_token VARCHAR(6) DEFAULT NULL AFTER password_hash",
         "password_reset_expires" => "ALTER TABLE users ADD COLUMN password_reset_expires DATETIME DEFAULT NULL AFTER password_reset_token",
+        "store_category" => "ALTER TABLE users ADD COLUMN store_category VARCHAR(80) DEFAULT NULL AFTER store_name",
     ];
 
     foreach ($columnStatements as $column => $statement) {
@@ -213,6 +214,48 @@ function ensure_order_items_table(mysqli $mysqli): void
     );
 }
 
+function ensure_categories_table(mysqli $mysqli): void
+{
+    $mysqli->query(
+        "CREATE TABLE IF NOT EXISTS categories (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(80) NOT NULL,
+            slug VARCHAR(80) NOT NULL UNIQUE,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            sort_order INT NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+
+    // Seed default categories if table is empty
+    $check = $mysqli->query("SELECT COUNT(*) AS total FROM categories");
+    if ($check) {
+        $row = $check->fetch_assoc();
+        $check->close();
+        if ((int) ($row["total"] ?? 0) === 0) {
+            $defaults = [
+                ["Store",      "store",      1],
+                ["Tech",       "tech",       2],
+                ["Restaurant", "restaurant", 3],
+                ["Art",        "art",        4],
+                ["Music",      "music",      5],
+                ["Coffee",     "coffee",     6],
+                ["Auto",       "auto",       7],
+            ];
+            $ins = $mysqli->prepare(
+                "INSERT IGNORE INTO categories (name, slug, is_active, sort_order) VALUES (?, ?, 1, ?)"
+            );
+            if ($ins) {
+                foreach ($defaults as [$catName, $catSlug, $catOrder]) {
+                    $ins->bind_param("ssi", $catName, $catSlug, $catOrder);
+                    $ins->execute();
+                }
+                $ins->close();
+            }
+        }
+    }
+}
+
 $conn = open_database_connection($DB_HOST, $DB_USER, $DB_PASS, $DB_NAME);
 $mysqli = $conn;
 
@@ -221,3 +264,4 @@ ensure_store_products_table($conn);
 ensure_gps_logs_table($conn);
 ensure_orders_schema($conn);
 ensure_order_items_table($conn);
+ensure_categories_table($conn);

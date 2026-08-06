@@ -108,6 +108,34 @@ function admin_filter_accounts(array $accounts, string $type): array
     }));
 }
 
+function admin_fetch_categories(mysqli $mysqli): array
+{
+    $categories = [];
+    $result = $mysqli->query(
+        "SELECT id, name, slug, is_active, sort_order, created_at
+         FROM categories
+         ORDER BY sort_order ASC, name ASC"
+    );
+
+    if (!$result) {
+        return [];
+    }
+
+    while ($row = $result->fetch_assoc()) {
+        $categories[] = [
+            "id"         => (int) $row["id"],
+            "name"       => (string) ($row["name"] ?? ""),
+            "slug"       => (string) ($row["slug"] ?? ""),
+            "is_active"  => (int) ($row["is_active"] ?? 0),
+            "sort_order" => (int) ($row["sort_order"] ?? 0),
+            "created_at" => (string) ($row["created_at"] ?? ""),
+        ];
+    }
+    $result->close();
+
+    return $categories;
+}
+
 function admin_fetch_products_by_store(mysqli $mysqli): array
 {
     $products = [];
@@ -290,11 +318,12 @@ function admin_fetch_live_payload(mysqli $mysqli, array $accounts = null, array 
 function admin_nav(string $active): string
 {
     $items = [
-        "dashboard" => ["href" => "dashboard.php", "label" => "Dashboard"],
-        "accounts" => ["href" => "accounts.php", "label" => "Accounts"],
-        "stores" => ["href" => "stores.php", "label" => "Stores"],
-        "users" => ["href" => "users.php", "label" => "Users"],
-        "profile" => ["href" => "profile.php", "label" => "Profile"],
+        "dashboard"  => ["href" => "dashboard.php",  "label" => "Dashboard"],
+        "accounts"   => ["href" => "accounts.php",   "label" => "Accounts"],
+        "stores"     => ["href" => "stores.php",     "label" => "Stores"],
+        "users"      => ["href" => "users.php",      "label" => "Users"],
+        "categories" => ["href" => "categories.php", "label" => "Categories"],
+        "profile"    => ["href" => "profile.php",    "label" => "Profile"],
     ];
 
     $html = '<nav class="store-admin-nav" aria-label="Admin pages">';

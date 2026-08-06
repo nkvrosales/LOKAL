@@ -150,6 +150,82 @@ if (!$is_store) {
         }
         unset($store);
     }
+
+    if (empty($stores)) {
+        $stores = [
+            [
+                "id" => "sample_1",
+                "name" => "Rome Gourmet Market",
+                "address" => "Piazza Navona 10, Rome, Italy",
+                "lat" => 41.8992,
+                "lng" => 12.4731,
+                "contact" => "+39 06 6880 1234",
+                "category" => "Restaurant",
+                "country" => "Italy",
+                "products" => []
+            ],
+            [
+                "id" => "sample_2",
+                "name" => "Cozy Corner Café",
+                "address" => "303 Java Blvd, Springfield",
+                "lat" => 42.1015,
+                "lng" => -72.5898,
+                "contact" => "+1 413 555 0199",
+                "category" => "Coffee",
+                "country" => "USA",
+                "products" => []
+            ],
+            [
+                "id" => "sample_3",
+                "name" => "Lisbon Wine Cellar",
+                "address" => "Rua Augusta 30, Lisbon, Portugal",
+                "lat" => 38.7097,
+                "lng" => -9.1365,
+                "contact" => "+351 21 342 5678",
+                "category" => "Restaurant",
+                "country" => "Portugal",
+                "products" => []
+            ],
+            [
+                "id" => "sample_4",
+                "name" => "Parisian Boulangerie",
+                "address" => "45 Rue de Rivoli, Paris, France",
+                "lat" => 48.8556,
+                "lng" => 2.3522,
+                "contact" => "+33 1 42 60 31 25",
+                "category" => "Restaurant",
+                "country" => "France",
+                "products" => []
+            ]
+        ];
+    }
+}
+
+// Fetch active categories from DB for sidebar pills
+$sidebar_categories = [];
+$cat_result = $mysqli->query(
+    "SELECT name, slug FROM categories WHERE is_active = 1 ORDER BY sort_order ASC, name ASC"
+);
+if ($cat_result) {
+    while ($cat_row = $cat_result->fetch_assoc()) {
+        $sidebar_categories[] = [
+            "name" => (string) ($cat_row["name"] ?? ""),
+            "slug" => (string) ($cat_row["slug"] ?? ""),
+        ];
+    }
+    $cat_result->close();
+}
+// Fallback if table is missing or empty
+if (empty($sidebar_categories)) {
+    $sidebar_categories = [
+        ["name" => "Store",      "slug" => "store"],
+        ["name" => "Tech",       "slug" => "tech"],
+        ["name" => "Restaurant", "slug" => "restaurant"],
+        ["name" => "Art",        "slug" => "art"],
+        ["name" => "Music",      "slug" => "music"],
+        ["name" => "Coffee",     "slug" => "coffee"],
+        ["name" => "Auto",       "slug" => "auto"],
+    ];
 }
 ?>
 <!DOCTYPE html>
@@ -164,14 +240,62 @@ if (!$is_store) {
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 </head>
 <body class="home-screen <?php echo $is_store ? "account-store" : "account-user"; ?>">
-    <main class="home-map-shell">
-        <div id="home-map"></div>
+    <div class="home-layout">
+        <?php if (!$is_store): ?>
+            <aside class="store-sidebar" id="store-sidebar">
+                <div class="sidebar-header">
+                    <div class="sidebar-top-bar">
+                        <h2 class="sidebar-title">Lokal Stores</h2>
+                        <button type="button" id="sidebar-collapse-btn" class="sidebar-collapse-btn" title="Hide sidebar" aria-label="Hide sidebar">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="15 18 9 12 15 6"></polyline>
+                            </svg>
+                        </button>
+                    </div>
 
-        <button id="menu-toggle" class="menu-toggle" type="button" aria-controls="menu-drawer" aria-expanded="false" aria-label="Open menu">
-            <span></span>
-            <span></span>
-            <span></span>
-        </button>
+                    <div class="sidebar-search-row">
+                        <input type="text" id="sidebar-search-input" class="sidebar-search-input" placeholder="Search by name or address" autocomplete="off">
+                        <button type="button" id="sidebar-locate-btn" class="sidebar-locate-btn" title="Current location" aria-label="Current location">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"></path>
+                                <circle cx="12" cy="9" r="2.5"></circle>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="sidebar-categories" id="sidebar-categories">
+                        <button type="button" class="cat-pill active" data-cat="all">All</button>
+                        <?php foreach ($sidebar_categories as $cat): ?>
+                            <button type="button" class="cat-pill" data-cat="<?php echo escape($cat['slug']); ?>">
+                                <?php echo escape($cat['name']); ?>
+                            </button>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+
+                <div class="sidebar-store-list" id="sidebar-store-list">
+                    <!-- Dynamic store cards -->
+                </div>
+            </aside>
+        <?php endif; ?>
+
+        <main class="home-map-shell">
+            <div id="home-map"></div>
+
+            <?php if (!$is_store): ?>
+                <button id="sidebar-expand-btn" class="sidebar-expand-btn" type="button" aria-label="Show stores sidebar" hidden>
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                    <span>Stores</span>
+                </button>
+            <?php endif; ?>
+
+            <button id="menu-toggle" class="menu-toggle" type="button" aria-controls="menu-drawer" aria-expanded="false" aria-label="Open menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
 
         <div class="map-status-chip" id="map-status">
             <?php echo $is_store ? "Map is active. Open menu for Profile and Product." : (count($stores) ? count($stores) . " stores available." : "No stores pinned yet."); ?>
@@ -297,6 +421,7 @@ if (!$is_store) {
             </section>
         <?php endif; ?>
     </main>
+</div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script>
@@ -307,6 +432,10 @@ if (!$is_store) {
 
         const map = L.map("home-map", { zoomControl: false }).setView([0, 0], 2);
         L.control.zoom({ position: "bottomright" }).addTo(map);
+
+        setTimeout(() => {
+            map.invalidateSize();
+        }, 150);
 
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
             attribution: "&copy; OpenStreetMap contributors"
@@ -509,12 +638,25 @@ if (!$is_store) {
             }
 
             function focusStore(storeId) {
-                const marker = markerByStoreId.get(storeId);
+                const marker = markerByStoreId.get(String(storeId));
                 if (!marker) {
+                    const store = stores.find((s) => String(s.id) === String(storeId));
+                    if (store && Number.isFinite(Number(store.lat)) && Number.isFinite(Number(store.lng))) {
+                        map.flyTo([store.lat, store.lng], 16, { duration: 0.55 });
+                        setStatus(store.name ? store.name : "Store location.");
+                    }
                     return;
                 }
                 map.flyTo(marker.getLatLng(), 16, { duration: 0.55 });
-                marker.openPopup();
+                if (marker.getTooltip()) {
+                    marker.openTooltip();
+                }
+                const store = stores.find((s) => String(s.id) === String(storeId));
+                if (store && store.name) {
+                    setStatus(store.name);
+                } else {
+                    setStatus(`${bounds.length} store${bounds.length === 1 ? "" : "s"} available.`);
+                }
             }
 
             function openStoreProfile(storeId) {
@@ -1163,6 +1305,148 @@ if (!$is_store) {
             renderCart();
             refreshUserOrders();
             orderPollTimer = window.setInterval(refreshUserOrders, 10000);
+
+            // Sidebar logic matching reference images
+            let activeCategory = "all";
+
+            function renderSidebarStores() {
+                const listEl = document.getElementById("sidebar-store-list");
+                if (!listEl) return;
+
+                const query = (document.getElementById("sidebar-search-input")?.value || "").toLowerCase().trim();
+
+                const filtered = stores.filter((store) => {
+                    const name = (store.name || "").toLowerCase();
+                    const address = (store.address || "").toLowerCase();
+                    const category = (store.category || "").toLowerCase();
+                    const productsStr = (store.products || []).map((p) => p.name || "").join(" ").toLowerCase();
+
+                    const matchesSearch = !query
+                        || name.includes(query)
+                        || address.includes(query)
+                        || productsStr.includes(query);
+
+                    let matchesCategory = true;
+                    if (activeCategory !== "all") {
+                        const catTarget = activeCategory.toLowerCase();
+                        matchesCategory = category.includes(catTarget)
+                            || name.includes(catTarget)
+                            || productsStr.includes(catTarget)
+                            || address.includes(catTarget);
+                    }
+
+                    return matchesSearch && matchesCategory;
+                });
+
+                if (!filtered.length) {
+                    listEl.innerHTML = `<div class="sidebar-empty-state"><p>No stores found matching your filter.</p></div>`;
+                    return;
+                }
+
+                listEl.innerHTML = filtered.map((store) => {
+                    const name = escapeHtml(store.name || "Store");
+                    const address = escapeHtml(store.address || "Address not provided");
+
+                    return `<div class="sidebar-store-card" data-store-id="${escapeHtml(String(store.id))}">
+                        <h3 class="sidebar-store-title">${name}</h3>
+                        <p class="sidebar-store-address">${address}</p>
+                        <div>
+                            <button type="button" class="sidebar-show-map-btn" data-action="show-on-map" data-store-id="${escapeHtml(String(store.id))}">Show on map</button>
+                        </div>
+                    </div>`;
+                }).join("");
+            }
+
+            const categoriesContainer = document.getElementById("sidebar-categories");
+            if (categoriesContainer) {
+                categoriesContainer.addEventListener("click", (e) => {
+                    const pill = e.target.closest(".cat-pill");
+                    if (!pill) return;
+                    categoriesContainer.querySelectorAll(".cat-pill").forEach((p) => p.classList.remove("active"));
+                    pill.classList.add("active");
+                    activeCategory = pill.dataset.cat || "all";
+                    renderSidebarStores();
+                });
+            }
+
+            const searchInput = document.getElementById("sidebar-search-input");
+            if (searchInput) {
+                searchInput.addEventListener("input", () => {
+                    renderSidebarStores();
+                });
+            }
+
+            const locateBtn = document.getElementById("sidebar-locate-btn");
+            if (locateBtn) {
+                locateBtn.addEventListener("click", () => {
+                    if (hasUserHomePin) {
+                        map.flyTo([userHomePin.lat, userHomePin.lng], 15, { duration: 0.5 });
+                        setStatus("Showing your saved location.");
+                    } else if ("geolocation" in navigator) {
+                        navigator.geolocation.getCurrentPosition(
+                            (pos) => {
+                                map.flyTo([pos.coords.latitude, pos.coords.longitude], 15, { duration: 0.5 });
+                                setStatus("Showing your current location.");
+                            },
+                            () => {
+                                setStatus("Geolocation permission denied.");
+                            }
+                        );
+                    }
+                });
+            }
+
+            const sidebarStoreList = document.getElementById("sidebar-store-list");
+            if (sidebarStoreList) {
+                sidebarStoreList.addEventListener("click", (e) => {
+                    const btn = e.target.closest("[data-action='show-on-map']");
+                    if (!btn) return;
+                    const storeId = btn.dataset.storeId;
+                    focusStore(storeId);
+                });
+            }
+
+            // Sidebar collapse / expand handlers
+            const storeSidebar = document.getElementById("store-sidebar");
+            const sidebarCollapseBtn = document.getElementById("sidebar-collapse-btn");
+            const sidebarExpandBtn = document.getElementById("sidebar-expand-btn");
+
+            function collapseSidebar() {
+                if (!storeSidebar) return;
+                document.body.classList.add("sidebar-collapsed");
+                storeSidebar.classList.remove("sidebar-open");
+                if (sidebarExpandBtn) {
+                    sidebarExpandBtn.hidden = false;
+                }
+                setTimeout(() => {
+                    if (typeof map !== "undefined" && map.invalidateSize) {
+                        map.invalidateSize();
+                    }
+                }, 310);
+            }
+
+            function expandSidebar() {
+                if (!storeSidebar) return;
+                document.body.classList.remove("sidebar-collapsed");
+                storeSidebar.classList.add("sidebar-open");
+                if (sidebarExpandBtn) {
+                    sidebarExpandBtn.hidden = true;
+                }
+                setTimeout(() => {
+                    if (typeof map !== "undefined" && map.invalidateSize) {
+                        map.invalidateSize();
+                    }
+                }, 310);
+            }
+
+            if (sidebarCollapseBtn) {
+                sidebarCollapseBtn.addEventListener("click", collapseSidebar);
+            }
+            if (sidebarExpandBtn) {
+                sidebarExpandBtn.addEventListener("click", expandSidebar);
+            }
+
+            renderSidebarStores();
         } else {
             const centerButton = document.getElementById("menu-center-store-pin");
             let storePinMarker = null;
@@ -1186,7 +1470,7 @@ if (!$is_store) {
                 const lng = Number(storeHomePin.lng);
                 placeStorePin(lat, lng);
                 map.setView([lat, lng], 15);
-                setStatus("Map centered to your saved store pin.");
+                setStatus("Showing your saved store pin.");
             } else if ("geolocation" in navigator) {
                 navigator.geolocation.getCurrentPosition(
                     (position) => {
@@ -1208,7 +1492,7 @@ if (!$is_store) {
                 centerButton.addEventListener("click", () => {
                     if (storePinMarker) {
                         map.flyTo(storePinMarker.getLatLng(), 15, { duration: 0.45 });
-                        setStatus("Centered to your store pin.");
+                        setStatus("Showing your store pin.");
                     } else {
                         setStatus("No saved store pin yet. Set it in Profile.");
                     }

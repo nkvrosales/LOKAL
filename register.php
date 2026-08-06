@@ -9,33 +9,35 @@ if (is_logged_in()) {
 
 $errors = [];
 $values = [
-    "account_type" => "user",
-    "first_name" => "",
-    "middle_name" => "",
-    "last_name" => "",
-    "contact" => "",
-    "email" => "",
-    "user_address" => "",
-    "user_lat" => "",
-    "user_lng" => "",
-    "store_address" => "",
-    "store_lat" => "",
-    "store_lng" => ""
+    "account_type"   => "user",
+    "first_name"     => "",
+    "middle_name"    => "",
+    "last_name"      => "",
+    "contact"        => "",
+    "email"          => "",
+    "user_address"   => "",
+    "user_lat"       => "",
+    "user_lng"       => "",
+    "store_address"  => "",
+    "store_lat"      => "",
+    "store_lng"      => "",
+    "store_category" => "",
 ];
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
-    $values["account_type"] = strtolower(trim($_POST["account_type"] ?? "user"));
-    $values["first_name"] = trim($_POST["first_name"] ?? "");
-    $values["middle_name"] = trim($_POST["middle_name"] ?? "");
-    $values["last_name"] = trim($_POST["last_name"] ?? "");
-    $values["contact"] = trim($_POST["contact"] ?? "");
-    $values["email"] = trim($_POST["email"] ?? "");
-    $values["user_address"] = trim($_POST["user_address"] ?? "");
-    $values["user_lat"] = trim($_POST["user_lat"] ?? "");
-    $values["user_lng"] = trim($_POST["user_lng"] ?? "");
-    $values["store_address"] = trim($_POST["store_address"] ?? "");
-    $values["store_lat"] = trim($_POST["store_lat"] ?? "");
-    $values["store_lng"] = trim($_POST["store_lng"] ?? "");
+    $values["account_type"]   = strtolower(trim($_POST["account_type"] ?? "user"));
+    $values["first_name"]     = trim($_POST["first_name"] ?? "");
+    $values["middle_name"]    = trim($_POST["middle_name"] ?? "");
+    $values["last_name"]      = trim($_POST["last_name"] ?? "");
+    $values["contact"]        = trim($_POST["contact"] ?? "");
+    $values["email"]          = trim($_POST["email"] ?? "");
+    $values["user_address"]   = trim($_POST["user_address"] ?? "");
+    $values["user_lat"]       = trim($_POST["user_lat"] ?? "");
+    $values["user_lng"]       = trim($_POST["user_lng"] ?? "");
+    $values["store_address"]  = trim($_POST["store_address"] ?? "");
+    $values["store_lat"]      = trim($_POST["store_lat"] ?? "");
+    $values["store_lng"]      = trim($_POST["store_lng"] ?? "");
+    $values["store_category"] = trim($_POST["store_category"] ?? "");
     $password = $_POST["password"] ?? "";
     $confirm_password = $_POST["confirm_password"] ?? "";
 
@@ -102,18 +104,20 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     if (!$errors) {
         $hash = password_hash($password, PASSWORD_DEFAULT);
         $stmt = $mysqli->prepare(
-            "INSERT INTO users (account_type, first_name, middle_name, last_name, contact, email, password_hash, user_address, user_lat, user_lng, store_address, store_lat, store_lng)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO users (account_type, first_name, middle_name, last_name, contact, email, password_hash, user_address, user_lat, user_lng, store_address, store_lat, store_lng, store_category)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         );
         if ($stmt) {
-            $user_address = $values["account_type"] === "user" ? $values["user_address"] : null;
-            $user_lat = $values["account_type"] === "user" ? $values["user_lat"] : null;
-            $user_lng = $values["account_type"] === "user" ? $values["user_lng"] : null;
-            $store_address = $values["account_type"] === "store" ? $values["store_address"] : null;
-            $store_lat = $values["account_type"] === "store" ? $values["store_lat"] : null;
-            $store_lng = $values["account_type"] === "store" ? $values["store_lng"] : null;
+            $user_address    = $values["account_type"] === "user"  ? $values["user_address"]   : null;
+            $user_lat        = $values["account_type"] === "user"  ? $values["user_lat"]        : null;
+            $user_lng        = $values["account_type"] === "user"  ? $values["user_lng"]        : null;
+            $store_address   = $values["account_type"] === "store" ? $values["store_address"]   : null;
+            $store_lat       = $values["account_type"] === "store" ? $values["store_lat"]       : null;
+            $store_lng       = $values["account_type"] === "store" ? $values["store_lng"]       : null;
+            $store_category  = $values["account_type"] === "store" && $values["store_category"] !== ""
+                ? $values["store_category"] : null;
             $stmt->bind_param(
-                "sssssssssssss",
+                "ssssssssssssss",
                 $values["account_type"],
                 $values["first_name"],
                 $values["middle_name"],
@@ -126,7 +130,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 $user_lng,
                 $store_address,
                 $store_lat,
-                $store_lng
+                $store_lng,
+                $store_category
             );
             if ($stmt->execute()) {
                 header("Location: login.php?registered=1");
@@ -136,6 +141,16 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         }
         $errors[] = "Registration failed. Please try again.";
     }
+}
+
+// Fetch active categories for store dropdown
+$reg_categories = [];
+$cat_res = $mysqli->query("SELECT name, slug FROM categories WHERE is_active = 1 ORDER BY sort_order ASC, name ASC");
+if ($cat_res) {
+    while ($cr = $cat_res->fetch_assoc()) {
+        $reg_categories[] = ["name" => $cr["name"], "slug" => $cr["slug"]];
+    }
+    $cat_res->close();
 }
 ?>
 <!DOCTYPE html>
@@ -202,6 +217,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         <input type="text" id="store_address" name="store_address" value="<?php echo escape($values["store_address"]); ?>" placeholder="Street, city, province" autocomplete="street-address">
                         <input type="hidden" id="store_lat" name="store_lat" value="<?php echo escape($values["store_lat"]); ?>">
                         <input type="hidden" id="store_lng" name="store_lng" value="<?php echo escape($values["store_lng"]); ?>">
+                    </div>
+                    <div class="field store-only" data-store-only>
+                        <label for="store_category">Store category</label>
+                        <select id="store_category" name="store_category" style="height:44px;padding:0 12px;border:1px solid rgba(255,91,46,.22);border-radius:10px;font-size:13.5px;outline:none;width:100%;background:#fff;box-sizing:border-box;">
+                            <option value="">— Select a category —</option>
+                            <?php foreach ($reg_categories as $rc): ?>
+                                <option value="<?php echo escape($rc['slug']); ?>" <?php echo $values['store_category'] === $rc['slug'] ? 'selected' : ''; ?>>
+                                    <?php echo escape($rc['name']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
                     <div class="field user-only" data-user-only>
                         <label for="user_address">Delivery address</label>
