@@ -13,6 +13,27 @@ $newAdmin = [
 ];
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    // Admin actions: approve or revoke driver approval
+    if (isset($_POST['driver_action'], $_POST['driver_id'])) {
+        $driverId = (int) ($_POST['driver_id'] ?? 0);
+        $action = $_POST['driver_action'] === 'approve' ? 'approve' : 'revoke';
+        if ($driverId > 0) {
+            $approveVal = $action === 'approve' ? 1 : 0;
+            $upd = $mysqli->prepare("UPDATE users SET is_approved = ? WHERE id = ? AND account_type = 'driver' LIMIT 1");
+            if ($upd) {
+                $upd->bind_param('ii', $approveVal, $driverId);
+                if ($upd->execute() && $upd->affected_rows > 0) {
+                    $notice = $approveVal ? 'Driver approved.' : 'Driver approval revoked.';
+                } else {
+                    $errors[] = 'Unable to update driver status.';
+                }
+                $upd->close();
+            } else {
+                $errors[] = 'Unable to update driver status.';
+            }
+        }
+    }
+
     foreach ($newAdmin as $field => $_) {
         $newAdmin[$field] = trim($_POST[$field] ?? "");
     }
@@ -147,18 +168,50 @@ $showAddModal = !empty($errors);
                             <th>Email</th>
                             <th>Contact</th>
                             <th>Location</th>
+                            <th>Status</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php foreach ($accounts as $account): ?>
                             <?php $location = $account["account_type"] === "store" ? $account["store_address"] : $account["user_address"]; ?>
-                            <tr>
-                                <td><?php echo escape(admin_account_name($account)); ?></td>
-                                <td><span class="admin-type-pill <?php echo escape($account["account_type"]); ?>"><?php echo escape(ucfirst($account["account_type"])); ?></span></td>
-                                <td><?php echo escape($account["email"]); ?></td>
-                                <td><?php echo escape($account["contact"]); ?></td>
-                                <td><?php echo escape($location !== "" ? $location : "--"); ?></td>
-                            </tr>
+                                    <tr>
+                                            <td><?php echo escape(admin_account_name($account)); ?></td>
+                                            <td><span class="admin-type-pill <?php echo escape($account["account_type"]); ?>"><?php echo escape(ucfirst($account["account_type"])); ?></span></td>
+                                            <td><?php echo escape($account["email"]); ?></td>
+                                            <td><?php echo escape($account["contact"]); ?></td>
+                                            <td><?php echo escape($location !== "" ? $location : "--"); ?></td>
+                                            <?php if ($account["account_type"] === 'driver'): ?>
+                                                <td>
+                                                    <?php if ($account["is_approved"]): ?>
+                                                        <span class="admin-type-pill approved">Approved</span>
+                                                    <?php else: ?>
+                                                        <span class="admin-type-pill pending">Pending</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td>
+                                                    <?php if ($account["id_image"] !== ""): ?>
+                                                        <a class="text-link" href="../uploads/ids/<?php echo urlencode($account["id_image"]);
+                                                        ?>" target="_blank" rel="noopener">View ID</a>
+                                                    <?php endif; ?>
+                                                    <?php if ($account["orcr_image"] !== ""): ?>
+                                                        <a class="text-link" style="margin-left:8px;" href="../uploads/orcr/<?php echo urlencode($account["orcr_image"]);
+                                                        ?>" target="_blank" rel="noopener">View OR/CR</a>
+                                                    <?php endif; ?>
+                                                    <form method="post" style="display:inline;margin-left:8px;">
+                                                        <input type="hidden" name="driver_id" value="<?php echo (int) $account['id']; ?>">
+                                                        <?php if (!$account["is_approved"]): ?>
+                                                            <button type="submit" name="driver_action" value="approve" class="acct-btn-save">Approve</button>
+                                                        <?php else: ?>
+                                                            <button type="submit" name="driver_action" value="revoke" class="acct-btn-cancel">Revoke</button>
+                                                        <?php endif; ?>
+                                                    </form>
+                                                </td>
+                                            <?php else: ?>
+                                                <td></td>
+                                                <td></td>
+                                            <?php endif; ?>
+                                        </tr>
                         <?php endforeach; ?>
                     </tbody>
                 </table>

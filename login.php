@@ -33,13 +33,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $stmt->execute();
             $stmt->bind_result($id, $first_name, $last_name, $account_type, $password_hash);
             if ($stmt->fetch() && password_verify($password, $password_hash)) {
-                if ($account_type === "admin") {
-                    $errors[] = "Use the admin login page for administrator accounts.";
+                if ($account_type === "driver") {
+                    $errors[] = "Use the delivery rider login page for rider accounts.";
                 } else {
                     session_regenerate_id(true);
                     $_SESSION["user_id"] = $id;
                     $_SESSION["user_name"] = $first_name . " " . $last_name;
                     $_SESSION["account_type"] = $account_type;
+                    if ($account_type === "admin") {
+                        header("Location: admin/dashboard.php");
+                        exit;
+                    }
                     header("Location: home.php");
                     exit;
                 }
@@ -118,6 +122,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     <div class="login-links">
                         <a class="text-link" href="forgot_password.php">Forgot password?</a>
                         <a class="text-link" href="register.php">Create account</a>
+                        <a class="text-link" href="driver_login.php">Delivery rider login</a>
                     </div>
                 </form>
             </section>

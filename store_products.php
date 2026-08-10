@@ -64,26 +64,41 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         if (!$errors) {
             $description_value = $product_values["product_description"] !== "" ? $product_values["product_description"] : null;
+            $product_image_filename = null;
+            if (isset($_FILES['product_image']) && is_uploaded_file($_FILES['product_image']['tmp_name'])) {
+                $allowed = ['jpg','jpeg','png','webp'];
+                $orig = $_FILES['product_image']['name'];
+                $ext = strtolower(pathinfo($orig, PATHINFO_EXTENSION));
+                if (in_array($ext, $allowed, true)) {
+                    $uploads_dir = __DIR__ . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'products';
+                    if (!is_dir($uploads_dir)) {
+                        mkdir($uploads_dir, 0755, true);
+                    }
+                    $product_image_filename = bin2hex(random_bytes(8)) . '_' . time() . '.' . $ext;
+                    $dest = $uploads_dir . DIRECTORY_SEPARATOR . $product_image_filename;
+                    move_uploaded_file($_FILES['product_image']['tmp_name'], $dest);
+                }
+            }
             $saved = false;
 
             if ($product_values["product_price"] === "") {
                 $insert_stmt = $mysqli->prepare(
-                    "INSERT INTO store_products (store_user_id, product_name, product_description)
-                     VALUES (?, ?, ?)"
+                    "INSERT INTO store_products (store_user_id, product_name, product_description, product_image)
+                     VALUES (?, ?, ?, ?)"
                 );
                 if ($insert_stmt) {
-                    $insert_stmt->bind_param("iss", $user_id, $product_values["product_name"], $description_value);
+                    $insert_stmt->bind_param("isss", $user_id, $product_values["product_name"], $description_value, $product_image_filename);
                     $saved = $insert_stmt->execute();
                     $insert_stmt->close();
                 }
             } else {
                 $price_value = (float) $product_values["product_price"];
                 $insert_stmt = $mysqli->prepare(
-                    "INSERT INTO store_products (store_user_id, product_name, product_description, product_price)
-                     VALUES (?, ?, ?, ?)"
+                    "INSERT INTO store_products (store_user_id, product_name, product_description, product_price, product_image)
+                     VALUES (?, ?, ?, ?, ?)"
                 );
                 if ($insert_stmt) {
-                    $insert_stmt->bind_param("issd", $user_id, $product_values["product_name"], $description_value, $price_value);
+                    $insert_stmt->bind_param("issds", $user_id, $product_values["product_name"], $description_value, $price_value, $product_image_filename);
                     $saved = $insert_stmt->execute();
                     $insert_stmt->close();
                 }
@@ -128,7 +143,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 }
 
 $list_stmt = $mysqli->prepare(
-    "SELECT id, product_name, product_description, product_price
+    "SELECT id, product_name, product_description, product_price, product_image
      FROM store_products
      WHERE store_user_id = ?
      ORDER BY id DESC"
@@ -136,13 +151,14 @@ $list_stmt = $mysqli->prepare(
 if ($list_stmt) {
     $list_stmt->bind_param("i", $user_id);
     $list_stmt->execute();
-    $list_stmt->bind_result($product_id, $product_name, $product_description, $product_price);
+    $list_stmt->bind_result($product_id, $product_name, $product_description, $product_price, $product_image);
     while ($list_stmt->fetch()) {
         $products[] = [
             "id" => (int) $product_id,
             "name" => trim((string) ($product_name ?? "")),
             "description" => trim((string) ($product_description ?? "")),
-            "price_label" => $format_price_label($product_price)
+            "price_label" => $format_price_label($product_price),
+            "image" => $product_image ? trim((string) $product_image) : null
         ];
     }
     $list_stmt->close();
@@ -190,7 +206,7 @@ if ($list_stmt) {
                 </div>
             <?php endif; ?>
 
-            <form method="post" class="form-stack store-product-form">
+            <form method="post" class="form-stack store-product-form" enctype="multipart/form-data">
                 <input type="hidden" name="product_add_submit" value="1">
                 <div class="field">
                     <label for="product_name">Product name</label>
@@ -204,6 +220,10 @@ if ($list_stmt) {
                     <label for="product_description">Description (optional)</label>
                     <textarea id="product_description" name="product_description" rows="3"><?php echo escape($product_values["product_description"]); ?></textarea>
                 </div>
+                <div class="field">
+                    <label for="product_image">Product image (optional)</label>
+                    <input type="file" id="product_image" name="product_image" accept="image/*">
+                </div>
                 <button class="btn" type="submit">Add Product</button>
             </form>
 
@@ -211,6 +231,11 @@ if ($list_stmt) {
                 <?php if ($products): ?>
                     <?php foreach ($products as $product): ?>
                         <article class="store-product-item">
+                            <?php if (!empty($product["image"])): ?>
+                                <div class="store-product-image">
+                                    <img src="uploads/products/<?php echo escape($product["image"]); ?>" alt="<?php echo escape($product["name"]); ?>">
+                                </div>
+                            <?php endif; ?>
                             <div class="store-product-copy">
                                 <h3><?php echo escape($product["name"] !== "" ? $product["name"] : "Product"); ?></h3>
                                 <?php if ($product["price_label"] !== ""): ?>

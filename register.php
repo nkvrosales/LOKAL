@@ -22,6 +22,8 @@ $values = [
     "store_lat"      => "",
     "store_lng"      => "",
     "store_category" => "",
+    "vehicle_registration" => "",
+    "orcr_image" => "",
 ];
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
@@ -38,10 +40,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $values["store_lat"]      = trim($_POST["store_lat"] ?? "");
     $values["store_lng"]      = trim($_POST["store_lng"] ?? "");
     $values["store_category"] = trim($_POST["store_category"] ?? "");
+    $values["vehicle_registration"] = trim($_POST["vehicle_registration"] ?? "");
     $password = $_POST["password"] ?? "";
     $confirm_password = $_POST["confirm_password"] ?? "";
 
-    if (!in_array($values["account_type"], ["user", "store"], true)) {
+    if (!in_array($values["account_type"], ["user", "store", "driver"], true)) {
         $errors[] = "Select a valid account type.";
     }
     if ($values["first_name"] === "") {
@@ -79,6 +82,32 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $errors[] = "Store location coordinates are invalid.";
         }
     }
+    if ($values["account_type"] === "driver") {
+        if ($values["vehicle_registration"] === "") {
+            $errors[] = "Vehicle registration is required for drivers.";
+        }
+        // ID image is required for driver accounts
+        if (!isset($_FILES["id_image"]) || !is_uploaded_file($_FILES["id_image"]["tmp_name"])) {
+            $errors[] = "Valid ID image is required for driver registration.";
+        } else {
+            $allowed_ext = ["jpg", "jpeg", "png", "webp"];
+            $orig = $_FILES["id_image"]["name"];
+            $ext = strtolower(pathinfo($orig, PATHINFO_EXTENSION));
+            if (!in_array($ext, $allowed_ext, true)) {
+                $errors[] = "ID image must be JPG, PNG, or WEBP.";
+            }
+        }
+        // OR/CR image required
+        if (!isset($_FILES["orcr_image"]) || !is_uploaded_file($_FILES["orcr_image"]["tmp_name"])) {
+            $errors[] = "OR/CR image is required for driver registration.";
+        } else {
+            $orig2 = $_FILES["orcr_image"]["name"];
+            $ext2 = strtolower(pathinfo($orig2, PATHINFO_EXTENSION));
+            if (!in_array($ext2, $allowed_ext, true)) {
+                $errors[] = "OR/CR image must be JPG, PNG, or WEBP.";
+            }
+        }
+    }
     if (strlen($password) < 6) {
         $errors[] = "Password must be at least 6 characters.";
     }
@@ -103,10 +132,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     if (!$errors) {
         $hash = password_hash($password, PASSWORD_DEFAULT);
-        $stmt = $mysqli->prepare(
-            "INSERT INTO users (account_type, first_name, middle_name, last_name, contact, email, password_hash, user_address, user_lat, user_lng, store_address, store_lat, store_lng, store_category)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-        );
+          $stmt = $mysqli->prepare(
+              "INSERT INTO users (account_type, first_name, middle_name, last_name, contact, email, password_hash, user_address, user_lat, user_lng, store_address, store_lat, store_lng, store_category, vehicle_registration, orcr_image, id_image)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+          );
         if ($stmt) {
             $user_address    = $values["account_type"] === "user"  ? $values["user_address"]   : null;
             $user_lat        = $values["account_type"] === "user"  ? $values["user_lat"]        : null;
@@ -116,8 +145,43 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $store_lng       = $values["account_type"] === "store" ? $values["store_lng"]       : null;
             $store_category  = $values["account_type"] === "store" && $values["store_category"] !== ""
                 ? $values["store_category"] : null;
+            // Handle driver ID and OR/CR uploads if provided
+            $id_image_filename = null;
+            $orcr_image_filename = null;
+            if ($values["account_type"] === "driver") {
+                $allowed_ext = ["jpg", "jpeg", "png", "webp"];
+                if (isset($_FILES["id_image"]) && is_uploaded_file($_FILES["id_image"]["tmp_name"])) {
+                    $orig = $_FILES["id_image"]["name"];
+                    $ext = strtolower(pathinfo($orig, PATHINFO_EXTENSION));
+                    if (in_array($ext, $allowed_ext, true)) {
+                        $uploads_dir = __DIR__ . DIRECTORY_SEPARATOR . "uploads" . DIRECTORY_SEPARATOR . "ids";
+                        if (!is_dir($uploads_dir)) {
+                            mkdir($uploads_dir, 0755, true);
+                        }
+                        $id_image_filename = bin2hex(random_bytes(8)) . "_" . time() . "." . $ext;
+                        $dest = $uploads_dir . DIRECTORY_SEPARATOR . $id_image_filename;
+                        move_uploaded_file($_FILES["id_image"]["tmp_name"], $dest);
+                    }
+                }
+                if (isset($_FILES["orcr_image"]) && is_uploaded_file($_FILES["orcr_image"]["tmp_name"])) {
+                    $orig2 = $_FILES["orcr_image"]["name"];
+                    $ext2 = strtolower(pathinfo($orig2, PATHINFO_EXTENSION));
+                    if (in_array($ext2, $allowed_ext, true)) {
+                        $uploads_dir2 = __DIR__ . DIRECTORY_SEPARATOR . "uploads" . DIRECTORY_SEPARATOR . "orcr";
+                        if (!is_dir($uploads_dir2)) {
+                            mkdir($uploads_dir2, 0755, true);
+                        }
+                        $orcr_image_filename = bin2hex(random_bytes(8)) . "_" . time() . "." . $ext2;
+                        $dest2 = $uploads_dir2 . DIRECTORY_SEPARATOR . $orcr_image_filename;
+                        move_uploaded_file($_FILES["orcr_image"]["tmp_name"], $dest2);
+                    }
+                }
+            }
+
+            $vehicle_registration = $values["account_type"] === "driver" ? $values["vehicle_registration"] : null;
+
             $stmt->bind_param(
-                "ssssssssssssss",
+                str_repeat("s", 17),
                 $values["account_type"],
                 $values["first_name"],
                 $values["middle_name"],
@@ -131,7 +195,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 $store_address,
                 $store_lat,
                 $store_lng,
-                $store_category
+                $store_category,
+                $vehicle_registration,
+                $orcr_image_filename,
+                $id_image_filename
             );
             if ($stmt->execute()) {
                 header("Location: login.php?registered=1");
@@ -198,7 +265,7 @@ if ($cat_res) {
                         <?php endforeach; ?>
                     </div>
                 <?php endif; ?>
-                <form method="post" class="form-stack">
+                <form method="post" class="form-stack" enctype="multipart/form-data">
                     <div class="field">
                         <label>Register as</label>
                         <div class="choice-group" role="radiogroup" aria-label="Account type">
@@ -209,6 +276,10 @@ if ($cat_res) {
                             <label class="choice-option">
                                 <input type="radio" name="account_type" value="store" <?php echo $values["account_type"] === "store" ? "checked" : ""; ?> required>
                                 <span>Store</span>
+                            </label>
+                            <label class="choice-option">
+                                <input type="radio" name="account_type" value="driver" <?php echo $values["account_type"] === "driver" ? "checked" : ""; ?> required>
+                                <span>Delivery Rider</span>
                             </label>
                         </div>
                     </div>
@@ -234,6 +305,20 @@ if ($cat_res) {
                         <input type="text" id="user_address" name="user_address" value="<?php echo escape($values["user_address"]); ?>" placeholder="Street, city, province" autocomplete="street-address">
                         <input type="hidden" id="user_lat" name="user_lat" value="<?php echo escape($values["user_lat"]); ?>">
                         <input type="hidden" id="user_lng" name="user_lng" value="<?php echo escape($values["user_lng"]); ?>">
+                    </div>
+                    <div class="driver-only" data-driver-only hidden>
+                        <div class="field">
+                            <label for="vehicle_registration">Vehicle registration</label>
+                            <input type="text" id="vehicle_registration" name="vehicle_registration" value="<?php echo escape($values['vehicle_registration']); ?>" placeholder="e.g. Motor, Tricycle, Car">
+                        </div>
+                        <div class="field">
+                            <label for="id_image">Valid ID (upload)</label>
+                            <input type="file" id="id_image" name="id_image" accept="image/*">
+                        </div>
+                        <div class="field">
+                            <label for="orcr_image">OR/CR document (upload)</label>
+                            <input type="file" id="orcr_image" name="orcr_image" accept="image/*">
+                        </div>
                     </div>
                     <div class="split">
                         <div class="field">
@@ -278,6 +363,7 @@ if ($cat_res) {
         const accountRadios = document.querySelectorAll('input[name="account_type"]');
         const storeOnlyFields = document.querySelectorAll('[data-store-only]');
         const userOnlyFields = document.querySelectorAll('[data-user-only]');
+        const driverOnlyFields = document.querySelectorAll('[data-driver-only]');
         const storeMapWrap = document.getElementById("store-map-wrap");
         const userMapWrap = document.getElementById("user-map-wrap");
         const brandCopy = document.getElementById("brand-copy");
@@ -403,45 +489,48 @@ if ($cat_res) {
             }
         }
 
-        function toggleStoreMode() {
-            const isStore = document.querySelector('input[name="account_type"]:checked')?.value === "store";
-            storeOnlyFields.forEach((field) => {
-                field.hidden = !isStore;
-            });
-            userOnlyFields.forEach((field) => {
-                field.hidden = isStore;
-            });
+        function toggleAccountMode() {
+            const selected = document.querySelector('input[name="account_type"]:checked')?.value || "user";
+            const isStore = selected === "store";
+            const isDriver = selected === "driver";
+
+            storeOnlyFields.forEach((field) => field.hidden = !isStore);
+            userOnlyFields.forEach((field) => field.hidden = isStore || isDriver);
+            driverOnlyFields.forEach((field) => field.hidden = !isDriver);
+
             if (storeAddressInput) {
                 storeAddressInput.required = isStore;
                 storeAddressInput.disabled = !isStore;
             }
             if (userAddressInput) {
-                userAddressInput.required = !isStore;
-                userAddressInput.disabled = isStore;
+                userAddressInput.required = !isStore && !isDriver;
+                userAddressInput.disabled = isStore || isDriver;
             }
             if (storeLatInput && storeLngInput) {
                 storeLatInput.disabled = !isStore;
                 storeLngInput.disabled = !isStore;
             }
             if (userLatInput && userLngInput) {
-                userLatInput.disabled = isStore;
-                userLngInput.disabled = isStore;
+                userLatInput.disabled = isStore || isDriver;
+                userLngInput.disabled = isStore || isDriver;
             }
+
             if (storeMapWrap) {
                 storeMapWrap.hidden = !isStore;
             }
             if (userMapWrap) {
-                userMapWrap.hidden = isStore;
+                userMapWrap.hidden = isStore || isDriver;
             }
             if (brandCopy) {
                 brandCopy.hidden = true;
             }
+
             if (isStore) {
                 initStoreMap();
                 if (storeMap) {
                     setTimeout(() => storeMap.invalidateSize(), 0);
                 }
-            } else {
+            } else if (!isDriver) {
                 initUserMap();
                 if (userMap) {
                     setTimeout(() => userMap.invalidateSize(), 0);
@@ -450,10 +539,10 @@ if ($cat_res) {
         }
 
         accountRadios.forEach((radio) => {
-            radio.addEventListener("change", toggleStoreMode);
+            radio.addEventListener("change", toggleAccountMode);
         });
 
-        toggleStoreMode();
+        toggleAccountMode();
     </script>
 </body>
 </html>

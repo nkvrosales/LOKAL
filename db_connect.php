@@ -2,7 +2,7 @@
 $DB_HOST = "localhost";
 $DB_USER = "root";
 $DB_PASS = "";
-$DB_NAME = "ffohsghk_lokal_app";
+$DB_NAME = "lokal_app";
 
 
 function quote_identifier(string $identifier): string
@@ -71,6 +71,10 @@ function ensure_users_schema(mysqli $mysqli): void
             middle_name VARCHAR(100) NOT NULL,
             last_name VARCHAR(100) NOT NULL,
             contact VARCHAR(30) NOT NULL,
+            vehicle_registration VARCHAR(100) DEFAULT NULL,
+            id_image VARCHAR(255) DEFAULT NULL,
+            orcr_image VARCHAR(255) DEFAULT NULL,
+            is_approved TINYINT(1) NOT NULL DEFAULT 0,
             email VARCHAR(191) NOT NULL UNIQUE,
             password_hash VARCHAR(255) NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -91,6 +95,10 @@ function ensure_users_schema(mysqli $mysqli): void
         "password_reset_token" => "ALTER TABLE users ADD COLUMN password_reset_token VARCHAR(6) DEFAULT NULL AFTER password_hash",
         "password_reset_expires" => "ALTER TABLE users ADD COLUMN password_reset_expires DATETIME DEFAULT NULL AFTER password_reset_token",
         "store_category" => "ALTER TABLE users ADD COLUMN store_category VARCHAR(80) DEFAULT NULL AFTER store_name",
+        "vehicle_registration" => "ALTER TABLE users ADD COLUMN vehicle_registration VARCHAR(100) DEFAULT NULL AFTER contact",
+        "id_image" => "ALTER TABLE users ADD COLUMN id_image VARCHAR(255) DEFAULT NULL AFTER vehicle_registration",
+        "orcr_image" => "ALTER TABLE users ADD COLUMN orcr_image VARCHAR(255) DEFAULT NULL AFTER id_image",
+        "is_approved" => "ALTER TABLE users ADD COLUMN is_approved TINYINT(1) NOT NULL DEFAULT 0 AFTER orcr_image",
     ];
 
     foreach ($columnStatements as $column => $statement) {
@@ -115,11 +123,16 @@ function ensure_store_products_table(mysqli $mysqli): void
             store_user_id INT NOT NULL,
             product_name VARCHAR(150) NOT NULL,
             product_description VARCHAR(255) DEFAULT NULL,
+            product_image VARCHAR(255) DEFAULT NULL,
             product_price DECIMAL(10, 2) DEFAULT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             INDEX idx_store_products_store_user_id (store_user_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
     );
+    $columns = get_table_columns($mysqli, "store_products");
+    if (!isset($columns["product_image"])) {
+        $mysqli->query("ALTER TABLE store_products ADD COLUMN product_image VARCHAR(255) DEFAULT NULL AFTER product_description");
+    }
 }
 
 function ensure_gps_logs_table(mysqli $mysqli): void

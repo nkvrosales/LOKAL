@@ -1,5 +1,13 @@
 <?php
-require_once __DIR__ . "/db_connect.php";
+require_once __DIR__ . "/auth.php";
+require_once __DIR__ . "/db.php";
+
+require_login();
+
+if (($_SESSION["account_type"] ?? "") !== "driver") {
+    header("Location: home.php");
+    exit;
+}
 
 function normalize_gps_row(array $row): array
 {

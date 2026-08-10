@@ -66,11 +66,11 @@ function admin_fetch_accounts(mysqli $mysqli): array
 {
     $accounts = [];
     $result = $mysqli->query(
-        "SELECT id, account_type, store_name, store_address, store_lat, store_lng,
-                user_address, user_lat, user_lng, first_name, middle_name, last_name,
-                contact, email, created_at
-         FROM users
-         ORDER BY FIELD(account_type, 'admin', 'store', 'user'), created_at DESC, id DESC"
+    "SELECT id, account_type, store_name, store_address, store_lat, store_lng,
+        user_address, user_lat, user_lng, first_name, middle_name, last_name,
+        contact, email, created_at, is_approved, id_image, vehicle_registration, orcr_image
+     FROM users
+     ORDER BY FIELD(account_type, 'admin', 'store', 'driver', 'user'), created_at DESC, id DESC"
     );
 
     if (!$result) {
@@ -93,6 +93,10 @@ function admin_fetch_accounts(mysqli $mysqli): array
             "last_name" => (string) ($row["last_name"] ?? ""),
             "contact" => (string) ($row["contact"] ?? ""),
             "email" => (string) ($row["email"] ?? ""),
+            "is_approved" => isset($row["is_approved"]) ? (int) $row["is_approved"] : 0,
+            "id_image" => (string) ($row["id_image"] ?? ""),
+            "vehicle_registration" => (string) ($row["vehicle_registration"] ?? ""),
+            "orcr_image" => (string) ($row["orcr_image"] ?? ""),
             "created_at" => (string) ($row["created_at"] ?? ""),
         ];
     }
