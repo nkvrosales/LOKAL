@@ -3,8 +3,17 @@ require_once "auth.php";
 require_once "db.php";
 
 if (is_logged_in()) {
-    if (($_SESSION["account_type"] ?? "") === "admin") {
+    $accountType = ($_SESSION["account_type"] ?? "");
+    if ($accountType === "admin") {
         header("Location: admin/dashboard.php");
+        exit;
+    }
+    if ($accountType === "store") {
+        header("Location: store_products.php");
+        exit;
+    }
+    if ($accountType === "driver") {
+        header("Location: driver_dashboard.php");
         exit;
     }
     header("Location: home.php");
@@ -14,6 +23,10 @@ if (is_logged_in()) {
 $errors = [];
 $email_value = "";
 $show_registered = isset($_GET["registered"]) && $_GET["registered"] === "1";
+$first_name = "";
+$last_name = "";
+$account_type = "";
+$password_hash = "";
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $email_value = trim($_POST["email"] ?? "");
@@ -27,7 +40,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     }
 
     if (!$errors) {
-        $stmt = $mysqli->prepare("SELECT id, first_name, last_name, account_type, password_hash FROM users WHERE email = ?");
+        $stmt = $mysqli->prepare("SELECT id, first_name, last_name, account_type, password_hash FROM users WHERE email = ? LIMIT 1");
         if ($stmt) {
             $stmt->bind_param("s", $email_value);
             $stmt->execute();
@@ -42,6 +55,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     $_SESSION["account_type"] = $account_type;
                     if ($account_type === "admin") {
                         header("Location: admin/dashboard.php");
+                        exit;
+                    }
+                    if ($account_type === "store") {
+                        header("Location: store_products.php");
                         exit;
                     }
                     header("Location: home.php");
