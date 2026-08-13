@@ -72,7 +72,7 @@ if (!$is_store) {
     }
 
     $stmt = $mysqli->prepare(
-        "SELECT id, store_name, first_name, last_name, store_address, store_lat, store_lng, store_contact, contact
+        "SELECT id, store_name, first_name, last_name, store_address, store_lat, store_lng, store_contact, contact, store_category
          FROM users
          WHERE account_type = 'store'
            AND store_lat IS NOT NULL
@@ -89,7 +89,8 @@ if (!$is_store) {
             $store_lat,
             $store_lng,
             $store_contact,
-            $default_contact
+            $default_contact,
+            $store_category
         );
         while ($stmt->fetch()) {
             $fallback_name = trim(($first_name ?? "") . " " . ($last_name ?? ""));
@@ -109,6 +110,7 @@ if (!$is_store) {
                 "lat" => (float) $store_lat,
                 "lng" => (float) $store_lng,
                 "contact" => $display_contact,
+                "category" => trim((string) ($store_category ?? "")),
                 "products" => []
             ];
             $store_ids[(int) $store_id] = true;
@@ -236,7 +238,7 @@ if (empty($sidebar_categories)) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Home | Lokal</title>
     <link rel="stylesheet" href="assets/styles.css?v=primary-bw-icons-1">
-    <link rel="stylesheet" href="assets/home.css?v=hover-effects-1">
+    <link rel="stylesheet" href="assets/home.css?v=store-category-badge-1">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 </head>
 <body class="home-screen <?php echo $is_store ? "account-store" : "account-user"; ?>">
@@ -429,6 +431,7 @@ if (empty($sidebar_categories)) {
         const stores = <?php echo json_encode($stores, JSON_UNESCAPED_SLASHES); ?>;
         const storeHomePin = <?php echo json_encode($store_home_pin, JSON_UNESCAPED_SLASHES); ?>;
         const userHomePin = <?php echo json_encode($user_home_pin, JSON_UNESCAPED_SLASHES); ?>;
+        const categoryMap = <?php echo json_encode(array_column($sidebar_categories, "name", "slug"), JSON_UNESCAPED_SLASHES); ?>;
 
         const map = L.map("home-map", { zoomControl: false }).setView([0, 0], 2);
         L.control.zoom({ position: "bottomright" }).addTo(map);
@@ -1346,10 +1349,12 @@ if (empty($sidebar_categories)) {
                 listEl.innerHTML = filtered.map((store) => {
                     const name = escapeHtml(store.name || "Store");
                     const address = escapeHtml(store.address || "Address not provided");
+                    const category = store.category ? escapeHtml(categoryMap[store.category] || store.category) : "";
 
                     return `<div class="sidebar-store-card" data-store-id="${escapeHtml(String(store.id))}">
                         <h3 class="sidebar-store-title">${name}</h3>
                         <p class="sidebar-store-address">${address}</p>
+                        ${category ? `<p class="sidebar-store-category">${category}</p>` : ""}
                         <div>
                             <button type="button" class="sidebar-show-map-btn" data-action="show-on-map" data-store-id="${escapeHtml(String(store.id))}">Show on map</button>
                         </div>

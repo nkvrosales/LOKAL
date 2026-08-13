@@ -18,6 +18,7 @@ $values = [
     "user_address"   => "",
     "user_lat"       => "",
     "user_lng"       => "",
+    "store_name"     => "",
     "store_address"  => "",
     "store_lat"      => "",
     "store_lng"      => "",
@@ -36,6 +37,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $values["user_address"]   = trim($_POST["user_address"] ?? "");
     $values["user_lat"]       = trim($_POST["user_lat"] ?? "");
     $values["user_lng"]       = trim($_POST["user_lng"] ?? "");
+    $values["store_name"]     = trim($_POST["store_name"] ?? "");
     $values["store_address"]  = trim($_POST["store_address"] ?? "");
     $values["store_lat"]      = trim($_POST["store_lat"] ?? "");
     $values["store_lng"]      = trim($_POST["store_lng"] ?? "");
@@ -73,6 +75,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         }
     }
     if ($values["account_type"] === "store") {
+        if ($values["store_name"] === "") {
+            $errors[] = "Store name is required.";
+        }
         if ($values["store_address"] === "") {
             $errors[] = "Store address is required.";
         }
@@ -133,10 +138,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     if (!$errors) {
         $hash = password_hash($password, PASSWORD_DEFAULT);
           $stmt = $mysqli->prepare(
-              "INSERT INTO users (account_type, first_name, middle_name, last_name, contact, email, password_hash, user_address, user_lat, user_lng, store_address, store_lat, store_lng, store_category, vehicle_registration, orcr_image, id_image)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+              "INSERT INTO users (account_type, store_name, first_name, middle_name, last_name, contact, email, password_hash, user_address, user_lat, user_lng, store_address, store_lat, store_lng, store_category, vehicle_registration, orcr_image, id_image)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
           );
         if ($stmt) {
+            $store_name      = $values["account_type"] === "store" ? $values["store_name"] : null;
             $user_address    = $values["account_type"] === "user"  ? $values["user_address"]   : null;
             $user_lat        = $values["account_type"] === "user"  ? $values["user_lat"]        : null;
             $user_lng        = $values["account_type"] === "user"  ? $values["user_lng"]        : null;
@@ -181,8 +187,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $vehicle_registration = $values["account_type"] === "driver" ? $values["vehicle_registration"] : null;
 
             $stmt->bind_param(
-                str_repeat("s", 17),
+                str_repeat("s", 18),
                 $values["account_type"],
+                $store_name,
                 $values["first_name"],
                 $values["middle_name"],
                 $values["last_name"],
@@ -284,6 +291,10 @@ if ($cat_res) {
                         </div>
                     </div>
                     <div class="field store-only" data-store-only>
+                        <label for="store_name">Store name</label>
+                        <input type="text" id="store_name" name="store_name" value="<?php echo escape($values["store_name"]); ?>" placeholder="Your store name">
+                    </div>
+                    <div class="field store-only" data-store-only>
                         <label for="store_address">Store address</label>
                         <input type="text" id="store_address" name="store_address" value="<?php echo escape($values["store_address"]); ?>" placeholder="Street, city, province" autocomplete="street-address">
                         <input type="hidden" id="store_lat" name="store_lat" value="<?php echo escape($values["store_lat"]); ?>">
@@ -368,6 +379,7 @@ if ($cat_res) {
         const userMapWrap = document.getElementById("user-map-wrap");
         const brandCopy = document.getElementById("brand-copy");
         const storeAddressInput = document.getElementById("store_address");
+        const storeNameInput = document.getElementById("store_name");
         const storeLatInput = document.getElementById("store_lat");
         const storeLngInput = document.getElementById("store_lng");
         const storeMapStatus = document.getElementById("store-map-status");
@@ -501,6 +513,10 @@ if ($cat_res) {
             if (storeAddressInput) {
                 storeAddressInput.required = isStore;
                 storeAddressInput.disabled = !isStore;
+            }
+            if (storeNameInput) {
+                storeNameInput.required = isStore;
+                storeNameInput.disabled = !isStore;
             }
             if (userAddressInput) {
                 userAddressInput.required = !isStore && !isDriver;
