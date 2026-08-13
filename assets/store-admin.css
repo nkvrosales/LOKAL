@@ -6,27 +6,49 @@ body.store-admin-body {
 .store-admin-nav {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   flex-wrap: wrap;
+  background: #F1F5F9;
+  padding: 4px;
+  border-radius: 999px;
+  border: 1px solid #E2E8F0;
 }
 
 .store-admin-tab {
-  padding: 8px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  color: #fff;
-  font-size: 13px;
-  background: rgba(255, 255, 255, 0.08);
-  transition: background-color 0.2s ease, border-color 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 999px;
+  border: 1.5px solid transparent;
+  color: #475569;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+  background: transparent;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
 }
 
 .store-admin-tab:hover {
-  background: rgba(255, 255, 255, 0.16);
+  color: #0F172A;
+  background: rgba(255, 255, 255, 0.8);
+  transform: translateY(-1px);
 }
 
 .store-admin-tab.active {
-  border-color: rgba(255, 91, 46, 0.9);
-  background: rgba(255, 91, 46, 0.18);
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--primary, #FF4D2E) 0%, var(--primary-hover, #E03E22) 100%);
+  color: #FFFFFF;
+  font-weight: 700;
+  box-shadow: 0 4px 14px var(--primary-glow, rgba(255, 77, 46, 0.35));
+}
+
+.store-admin-tab[href="logout.php"]:hover {
+  background: #FEF2F2;
+  color: #DC2626;
+  border-color: #FCA5A5;
 }
 
 .store-admin-shell {
@@ -81,25 +103,43 @@ body.store-admin-body {
 }
 
 .profile-location-btn {
-  border: 1px solid rgba(255, 91, 46, 0.22);
-  border-radius: 10px;
-  padding: 9px 12px;
-  background: rgba(255, 91, 46, 0.1);
-  color: #FF5B2E;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1.5px solid rgba(255, 77, 46, 0.3);
+  border-radius: 999px;
+  padding: 6px 14px;
+  background: linear-gradient(135deg, rgba(255, 77, 46, 0.12) 0%, rgba(255, 77, 46, 0.05) 100%);
+  color: var(--primary, #FF4D2E);
   cursor: pointer;
-  font: inherit;
-  font-size: 13px;
+  font-family: inherit;
+  font-size: 12px;
   font-weight: 700;
+  letter-spacing: 0.2px;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 6px rgba(255, 77, 46, 0.08);
+  user-select: none;
 }
 
 .profile-location-btn:hover,
 .profile-location-btn:focus-visible {
-  background: rgba(255, 91, 46, 0.16);
+  background: linear-gradient(135deg, rgba(255, 77, 46, 0.22) 0%, rgba(255, 77, 46, 0.12) 100%);
+  border-color: var(--primary, #FF4D2E);
+  box-shadow: 0 4px 14px rgba(255, 77, 46, 0.2);
+  transform: translateY(-1px);
+}
+
+.profile-location-btn:active {
+  transform: translateY(0) scale(0.97);
+  box-shadow: 0 2px 4px rgba(255, 77, 46, 0.1);
 }
 
 .profile-location-btn:disabled {
   cursor: wait;
-  opacity: 0.68;
+  opacity: 0.65;
+  box-shadow: none;
+  transform: none;
 }
 
 .store-pin-status {

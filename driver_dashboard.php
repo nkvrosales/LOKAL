@@ -252,18 +252,23 @@ $initialStatus = $current
             <span></span>
         </button>
 
-        <div class="map-status-chip" id="map-status"><?php echo escape_value($initialStatus); ?></div>
 
         <aside class="menu-drawer" id="menu-drawer" aria-hidden="true">
             <div class="menu-head">
-                <h2>Driver Live</h2>
+                <img class="menu-logo" src="732961553_1045061465131627_5347302832846310517_n.png" alt="Lokal">
                 <button class="menu-close" id="menu-close" type="button" aria-label="Close menu">&times;</button>
             </div>
 
             <section class="menu-section">
-                <h3>Controls</h3>
-                <button type="button" class="menu-link" id="menu-center-live">Center to latest GPS</button>
-                <button type="button" class="menu-link" id="menu-refresh-now">Refresh now</button>
+                <h3>Rider Controls</h3>
+                <button type="button" class="menu-link" id="menu-center-live">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                    <span>Center to latest GPS</span>
+                </button>
+                <button type="button" class="menu-link" id="menu-refresh-now">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                    <span>Refresh now</span>
+                </button>
                 <a
                     class="menu-link"
                     id="menu-open-google"
@@ -271,11 +276,14 @@ $initialStatus = $current
                     target="_blank"
                     rel="noopener"
                     <?php echo $googleMapsUrl === "" ? 'aria-disabled="true"' : ""; ?>
-                >Open in Google Maps</a>
+                >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+                    <span>Open in Google Maps</span>
+                </a>
             </section>
 
             <section class="menu-section">
-                <h3>Live Feed</h3>
+                <h3>Live GPS Feed</h3>
                 <p class="menu-meta" id="drawer-feed-status"><?php echo $current ? "Receiving GPS updates from gps_logs." : "No GPS rows with coordinates yet."; ?></p>
                 <p class="menu-meta" id="drawer-device">Device: <?php echo escape_value(display_value($current["device"] ?? null)); ?></p>
                 <p class="menu-meta" id="drawer-status">Status: <?php echo escape_value(display_value($current["status"] ?? null)); ?></p>
@@ -284,10 +292,18 @@ $initialStatus = $current
             </section>
 
             <section class="menu-section">
-                <h3>Polling</h3>
-                <p class="menu-meta">Source table: gps_logs</p>
-                <p class="menu-meta">Refresh interval: every 10 seconds</p>
-                <p class="menu-meta">Map target: latest GPS coordinate only</p>
+                <h3>Account</h3>
+                <div class="user-card-info">
+                    <div class="user-avatar-circle"><?php echo strtoupper(substr($_SESSION["user_name"] ?? "R", 0, 1)); ?></div>
+                    <div>
+                        <p class="menu-user-name"><?php echo escape_value($_SESSION["user_name"] ?? "Rider"); ?></p>
+                        <p class="menu-user-role">Delivery Rider</p>
+                    </div>
+                </div>
+                <a class="menu-link menu-logout" href="logout.php">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    <span>Log out</span>
+                </a>
             </section>
         </aside>
 

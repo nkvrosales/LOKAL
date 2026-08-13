@@ -299,9 +299,6 @@ if (empty($sidebar_categories)) {
                 <span></span>
             </button>
 
-        <div class="map-status-chip" id="map-status">
-            <?php echo $is_store ? "Map is active. Open menu for Profile and Product." : (count($stores) ? count($stores) . " stores available." : "No stores pinned yet."); ?>
-        </div>
 
         <?php if (!$is_store): ?>
             <button type="button" class="cart-toggle-btn" id="cart-toggle" aria-controls="cart-panel" aria-expanded="false" aria-label="Toggle cart">
@@ -388,25 +385,53 @@ if (empty($sidebar_categories)) {
             </div>
 
             <section class="menu-section">
-                <h3>Store Menu</h3>
+                <h3>Navigation</h3>
                 <?php if ($is_store): ?>
-                    <a class="menu-link" href="account_profile.php">Profile</a>
-                    <a class="menu-link" href="store_products.php">Product</a>
-                    <a class="menu-link" href="order_history.php">Orders</a>
-                    <button type="button" class="menu-link" id="menu-center-store-pin">Center to store pin</button>
+                    <a class="menu-link" href="account_profile.php">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                        <span>Profile</span>
+                    </a>
+                    <a class="menu-link" href="store_products.php">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                        <span>Product</span>
+                    </a>
+                    <a class="menu-link" href="order_history.php">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                        <span>Orders</span>
+                    </a>
+                    <button type="button" class="menu-link" id="menu-center-store-pin">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                        <span>Center to store pin</span>
+                    </button>
                 <?php else: ?>
-                    <a class="menu-link" href="account_profile.php">Profile</a>
-                    <a class="menu-link" href="cart.php">Cart</a>
-                    <a class="menu-link" href="order_history.php">Orders</a>
-
+                    <a class="menu-link" href="account_profile.php">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                        <span>Profile</span>
+                    </a>
+                    <a class="menu-link" href="cart.php">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.8"/><circle cx="18" cy="20" r="1.8"/><path d="M3 4h2.5l2.2 11.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 8H7"/></svg>
+                        <span>Cart</span>
+                    </a>
+                    <a class="menu-link" href="order_history.php">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                        <span>Orders</span>
+                    </a>
                 <?php endif; ?>
             </section>
 
             <section class="menu-section">
                 <h3>User Account</h3>
-                <p class="menu-meta"><?php echo escape($user_name); ?></p>
-                <p class="menu-meta">Account type: <?php echo $is_store ? "Store" : "User"; ?></p>
-                <a class="menu-link menu-logout" href="logout.php">Log out</a>
+                <div class="user-card-info">
+                    <div class="user-avatar-circle"><?php echo strtoupper(substr($user_name, 0, 1)); ?></div>
+                    <div>
+                        <p class="menu-user-name"><?php echo escape($user_name); ?></p>
+                        <p class="menu-user-role"><?php echo $is_store ? "Store Account" : "Customer Account"; ?></p>
+                    </div>
+                </div>
+                <a class="menu-link menu-logout" href="logout.php">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    <span>Log out</span>
+                </a>
             </section>
         </aside>
 
@@ -587,6 +612,7 @@ if (empty($sidebar_categories)) {
             let checkoutType = "delivery";
             let orderPollTimer = null;
             let riderMarker = null;
+            let userLocationMarker = null;
             let customerMarker = null;
             let customerRouteLayer = null;
             let activeTrackedOrderId = null;
@@ -601,7 +627,7 @@ if (empty($sidebar_categories)) {
                 const address = userHomePin.address && userHomePin.address !== ""
                     ? escapeHtml(userHomePin.address)
                     : "Your saved location";
-                L.marker([userLat, userLng], { icon: customerIcon })
+                userLocationMarker = L.marker([userLat, userLng], { icon: customerIcon })
                     .addTo(map)
                     .bindTooltip(`<strong>Your Location</strong><br>${address}`, {
                         direction: "top",
@@ -1384,19 +1410,56 @@ if (empty($sidebar_categories)) {
             const locateBtn = document.getElementById("sidebar-locate-btn");
             if (locateBtn) {
                 locateBtn.addEventListener("click", () => {
-                    if (hasUserHomePin) {
-                        map.flyTo([userHomePin.lat, userHomePin.lng], 15, { duration: 0.5 });
-                        setStatus("Showing your saved location.");
-                    } else if ("geolocation" in navigator) {
+                    setStatus("Locating your current position...");
+                    locateBtn.style.opacity = "0.6";
+
+                    function showUserPositionOnMap(lat, lng, addressLabel) {
+                        locateBtn.style.opacity = "1";
+                        if (userLocationMarker) {
+                            userLocationMarker.setLatLng([lat, lng]);
+                        } else {
+                            userLocationMarker = L.marker([lat, lng], { icon: customerIcon }).addTo(map);
+                        }
+                        userLocationMarker.bindTooltip(`<strong>Your Current Location</strong><br>${escapeHtml(addressLabel)}`, {
+                            direction: "top",
+                            offset: [0, -35],
+                            opacity: 0.96
+                        }).openTooltip();
+                        map.flyTo([lat, lng], 16, { duration: 0.6 });
+                        setStatus(`Showing your location: ${addressLabel}`);
+                    }
+
+                    if ("geolocation" in navigator) {
                         navigator.geolocation.getCurrentPosition(
                             (pos) => {
-                                map.flyTo([pos.coords.latitude, pos.coords.longitude], 15, { duration: 0.5 });
-                                setStatus("Showing your current location.");
+                                const lat = pos.coords.latitude;
+                                const lng = pos.coords.longitude;
+                                fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}`)
+                                    .then((res) => (res.ok ? res.json() : null))
+                                    .then((data) => {
+                                        const label = (data && data.display_name) ? data.display_name : `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+                                        showUserPositionOnMap(lat, lng, label);
+                                    })
+                                    .catch(() => {
+                                        showUserPositionOnMap(lat, lng, `${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+                                    });
                             },
-                            () => {
-                                setStatus("Geolocation permission denied.");
-                            }
+                            (error) => {
+                                locateBtn.style.opacity = "1";
+                                if (hasUserHomePin) {
+                                    showUserPositionOnMap(Number(userHomePin.lat), Number(userHomePin.lng), userHomePin.address || "Saved Profile Location");
+                                    setStatus("Location permission denied. Showing saved profile location.");
+                                } else {
+                                    setStatus("Could not access your location. Please check browser permissions.");
+                                }
+                            },
+                            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
                         );
+                    } else if (hasUserHomePin) {
+                        showUserPositionOnMap(Number(userHomePin.lat), Number(userHomePin.lng), userHomePin.address || "Saved Profile Location");
+                    } else {
+                        locateBtn.style.opacity = "1";
+                        setStatus("Geolocation is not supported by your browser.");
                     }
                 });
             }

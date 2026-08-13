@@ -78,10 +78,18 @@ if ($userStmt) {
 </head>
 <body class="store-admin-body">
     <header class="top-bar">
-        <a class="logo" href="home.php" style="text-decoration:none">Lokal</a>
+        <a class="logo" href="home.php" style="text-decoration:none">
+            <span style="color:var(--primary, #FF4D2E)">LOKAL</span>
+        </a>
         <nav class="store-admin-nav" aria-label="Checkout navigation">
-            <a class="store-admin-tab" href="store_profile.php?id=<?php echo (int) $store["id"]; ?>">Back to store</a>
-            <a class="store-admin-tab" href="home.php">Home</a>
+            <a class="store-admin-tab" href="store_profile.php?id=<?php echo (int) $store["id"]; ?>">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                <span>Back to store</span>
+            </a>
+            <a class="store-admin-tab" href="home.php">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                <span>Home</span>
+            </a>
         </nav>
     </header>
 

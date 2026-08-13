@@ -399,17 +399,37 @@ if ($pcat) {
 </head>
 <body class="store-admin-body">
     <header class="top-bar">
-        <a class="logo" href="home.php" style="text-decoration:none">Lokal</a>
+        <a class="logo" href="home.php" style="text-decoration:none">
+            <span style="color:var(--primary, #FF4D2E)">LOKAL</span>
+        </a>
         <nav class="store-admin-nav" aria-label="Account pages">
-            <a class="store-admin-tab" href="home.php">Home</a>
-            <a class="store-admin-tab active" href="account_profile.php">Profile</a>
-            <a class="store-admin-tab" href="order_history.php">Orders</a>
+            <a class="store-admin-tab" href="home.php">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                <span>Home</span>
+            </a>
+            <a class="store-admin-tab active" href="account_profile.php">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span>Profile</span>
+            </a>
+            <a class="store-admin-tab" href="order_history.php">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                <span>Order History</span>
+            </a>
             <?php if ($isStore): ?>
-                <a class="store-admin-tab" href="store_products.php">Product</a>
+                <a class="store-admin-tab" href="store_products.php">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                    <span>Product</span>
+                </a>
             <?php else: ?>
-                <a class="store-admin-tab" href="cart.php">Cart</a>
+                <a class="store-admin-tab" href="cart.php">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.8"/><circle cx="18" cy="20" r="1.8"/><path d="M3 4h2.5l2.2 11.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 8H7"/></svg>
+                    <span>Cart</span>
+                </a>
             <?php endif; ?>
-            <a class="store-admin-tab" href="logout.php">Log out</a>
+            <a class="store-admin-tab" href="logout.php">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                <span>Log out</span>
+            </a>
         </nav>
     </header>
 
@@ -483,7 +503,10 @@ if ($pcat) {
                     <div class="field">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
                             <label for="user_address" style="margin-bottom:0;">Delivery address</label>
-                            <button class="profile-location-btn" id="use-current-location-field-btn" type="button" style="padding: 4px 10px; font-size: 11.5px;">📍 Use current location</button>
+                            <button class="profile-location-btn" id="use-current-location-field-btn" type="button">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                                <span>Use current location</span>
+                            </button>
                         </div>
                         <div class="address-autofill-wrap">
                             <input type="text" id="user_address" name="user_address" value="<?php echo escape($profile["user_address"]); ?>" placeholder="Start typing your delivery address…" autocomplete="off" required>
@@ -495,9 +518,7 @@ if ($pcat) {
                     <input type="hidden" id="map_lng" name="user_lng" value="<?php echo escape($profile["user_lng"]); ?>">
                 <?php endif; ?>
 
-                <div class="profile-map-actions">
-                    <button class="profile-location-btn" id="use-current-location" type="button">Use my current location</button>
-                </div>
+
                 <div id="profile-map"></div>
                 <p class="store-pin-status" id="pin-status">
                     <?php if ($mapLat !== "" && $mapLng !== ""): ?>
@@ -588,52 +609,54 @@ if ($pcat) {
 
         function pinCurrentLocation() {
             if (!("geolocation" in navigator)) {
-                pinStatus.textContent = "Location access is not available in this browser.";
+                if (pinStatus) pinStatus.textContent = "Location access is not available in this browser.";
                 return;
             }
 
-            if (locationButton) {
-                locationButton.disabled = true;
-                locationButton.textContent = "Locating...";
-            }
-            pinStatus.textContent = "Getting your current location...";
+            const btnMap = document.getElementById("use-current-location");
+            const btnField = document.getElementById("use-current-location-field-btn");
+
+            const locatingHtml = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite;"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg> <span>Locating…</span>';
+            const iconHtml = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>';
+
+            if (btnMap) { btnMap.disabled = true; btnMap.innerHTML = locatingHtml; }
+            if (btnField) { btnField.disabled = true; btnField.innerHTML = locatingHtml; }
+            if (pinStatus) pinStatus.textContent = "Getting your current location...";
 
             navigator.geolocation.getCurrentPosition(
                 (position) => {
                     const lat = position.coords.latitude;
                     const lng = position.coords.longitude;
                     setPin(lat, lng, true);
-                    pinStatus.textContent = `Pinned from your current location at ${latInput.value}, ${lngInput.value}.`;
+                    if (pinStatus) pinStatus.textContent = `Pinned from your current location at ${latInput.value}, ${lngInput.value}.`;
                     suggestAddressFromPin(lat, lng);
-                    if (locationButton) {
-                        locationButton.disabled = false;
-                        locationButton.textContent = "Use my current location";
-                    }
+                    if (btnMap) { btnMap.disabled = false; btnMap.innerHTML = `${iconHtml} <span>Use my current location</span>`; }
+                    if (btnField) { btnField.disabled = false; btnField.innerHTML = `${iconHtml} <span>Use current location</span>`; }
                 },
                 () => {
-                    pinStatus.textContent = "Unable to access your current location. Allow location permission and try again.";
-                    if (locationButton) {
-                        locationButton.disabled = false;
-                        locationButton.textContent = "Use my current location";
-                    }
+                    if (pinStatus) pinStatus.textContent = "Unable to access your current location. Allow location permission and try again.";
+                    if (btnMap) { btnMap.disabled = false; btnMap.innerHTML = `${iconHtml} <span>Use my current location</span>`; }
+                    if (btnField) { btnField.disabled = false; btnField.innerHTML = `${iconHtml} <span>Use current location</span>`; }
                 },
-                { enableHighAccuracy: true, timeout: 10000 }
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
         }
 
         const existingLat = Number(latInput.value);
         const existingLng = Number(lngInput.value);
-        if (Number.isFinite(existingLat) && Number.isFinite(existingLng)) {
+        if (Number.isFinite(existingLat) && Number.isFinite(existingLng) && existingLat !== 0 && existingLng !== 0) {
             setPin(existingLat, existingLng, true);
         } else if ("geolocation" in navigator) {
             navigator.geolocation.getCurrentPosition(
                 (position) => {
                     map.setView([position.coords.latitude, position.coords.longitude], 14);
-                    pinStatus.textContent = "Current location found. Click Use my current location to pin it.";
+                    if (pinStatus) pinStatus.textContent = "Current location found. Tap on map to pin exact delivery spot.";
                 },
                 () => map.setView([14.5995, 120.9842], 12),
                 { enableHighAccuracy: true, timeout: 10000 }
             );
+        } else {
+            map.setView([14.5995, 120.9842], 12);
         }
 
         map.on("click", (event) => {

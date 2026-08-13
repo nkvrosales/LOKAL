@@ -310,24 +310,40 @@ if ($cat_res) {
         @keyframes spin { to { transform: translateY(-50%) rotate(360deg); } }
 
         .profile-location-btn {
-            border: 1px solid rgba(255, 91, 46, 0.22);
-            border-radius: 10px;
-            padding: 8px 14px;
-            background: rgba(255, 91, 46, 0.1);
-            color: #FF5B2E;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            border: 1.5px solid rgba(255, 77, 46, 0.3);
+            border-radius: 999px;
+            padding: 6px 14px;
+            background: linear-gradient(135deg, rgba(255, 77, 46, 0.12) 0%, rgba(255, 77, 46, 0.05) 100%);
+            color: #FF4D2E;
             cursor: pointer;
-            font: inherit;
-            font-size: 13px;
+            font-family: inherit;
+            font-size: 12px;
             font-weight: 700;
-            transition: background 0.15s ease, opacity 0.15s ease;
+            letter-spacing: 0.2px;
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 2px 6px rgba(255, 77, 46, 0.08);
+            user-select: none;
         }
         .profile-location-btn:hover,
         .profile-location-btn:focus-visible {
-            background: rgba(255, 91, 46, 0.18);
+            background: linear-gradient(135deg, rgba(255, 77, 46, 0.22) 0%, rgba(255, 77, 46, 0.12) 100%);
+            border-color: #FF4D2E;
+            box-shadow: 0 4px 14px rgba(255, 77, 46, 0.2);
+            transform: translateY(-1px);
+        }
+        .profile-location-btn:active {
+            transform: translateY(0) scale(0.97);
+            box-shadow: 0 2px 4px rgba(255, 77, 46, 0.1);
         }
         .profile-location-btn:disabled {
             cursor: wait;
-            opacity: 0.68;
+            opacity: 0.65;
+            box-shadow: none;
+            transform: none;
         }
     </style>
 </head>
@@ -351,7 +367,10 @@ if ($cat_res) {
                         <h2>Delivery location</h2>
                         <p class="status-text">Tap the map to drop a pin for your delivery address.</p>
                         <div style="margin-bottom:10px;">
-                            <button class="profile-location-btn" id="use-current-location" type="button">📍 Use my current location</button>
+                            <button class="profile-location-btn" id="use-current-location" type="button">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                                <span>Use my current location</span>
+                            </button>
                         </div>
                         <div id="user-map"></div>
                         <div class="map-status" id="user-map-status">No location pinned yet.</div>
@@ -411,7 +430,10 @@ if ($cat_res) {
                     <div class="field user-only" data-user-only>
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
                             <label for="user_address" style="margin-bottom:0;">Delivery address</label>
-                            <button class="profile-location-btn" id="use-current-location-field-btn" type="button" style="padding: 4px 10px; font-size: 11.5px;">📍 Use current location</button>
+                            <button class="profile-location-btn" id="use-current-location-field-btn" type="button">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                                <span>Use current location</span>
+                            </button>
                         </div>
                         <div class="address-autofill-wrap">
                             <input type="text" id="user_address" name="user_address" value="<?php echo escape($values["user_address"]); ?>" placeholder="Start typing your delivery address…" autocomplete="off">
@@ -694,8 +716,8 @@ if ($cat_res) {
             const btnMap = document.getElementById("use-current-location");
             const btnField = document.getElementById("use-current-location-field-btn");
 
-            if (btnMap) { btnMap.disabled = true; btnMap.textContent = "Locating…"; }
-            if (btnField) { btnField.disabled = true; btnField.textContent = "Locating…"; }
+            if (btnMap) { btnMap.disabled = true; btnMap.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite;"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg> <span>Locating…</span>'; }
+            if (btnField) { btnField.disabled = true; btnField.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite;"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg> <span>Locating…</span>'; }
             setUserMapStatus("Getting your current location…");
 
             navigator.geolocation.getCurrentPosition(
@@ -708,13 +730,15 @@ if ($cat_res) {
                         userMap.setView([lat, lng], 15);
                     }
                     reverseGeocodeUserAddress(lat, lng);
-                    if (btnMap) { btnMap.disabled = false; btnMap.textContent = "📍 Use my current location"; }
-                    if (btnField) { btnField.disabled = false; btnField.textContent = "📍 Use current location"; }
+                    const iconHtml = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>';
+                    if (btnMap) { btnMap.disabled = false; btnMap.innerHTML = `${iconHtml} <span>Use my current location</span>`; }
+                    if (btnField) { btnField.disabled = false; btnField.innerHTML = `${iconHtml} <span>Use current location</span>`; }
                 },
                 () => {
                     setUserMapStatus("Unable to access current location. Please check browser permissions.");
-                    if (btnMap) { btnMap.disabled = false; btnMap.textContent = "📍 Use my current location"; }
-                    if (btnField) { btnField.disabled = false; btnField.textContent = "📍 Use current location"; }
+                    const iconHtml = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>';
+                    if (btnMap) { btnMap.disabled = false; btnMap.innerHTML = `${iconHtml} <span>Use my current location</span>`; }
+                    if (btnField) { btnField.disabled = false; btnField.innerHTML = `${iconHtml} <span>Use current location</span>`; }
                 },
                 { enableHighAccuracy: true, timeout: 10000 }
             );
