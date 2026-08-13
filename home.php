@@ -11,6 +11,14 @@ if ($account_type === "admin") {
     exit;
 }
 $is_store = ($_SESSION["account_type"] ?? "") === "store";
+$user_profile_image = $_SESSION["profile_image"] ?? "";
+if ($user_profile_image === "" && $user_id > 0) {
+    $u_res = $mysqli->query("SELECT profile_image FROM users WHERE id = {$user_id} LIMIT 1");
+    if ($u_res && $u_row = $u_res->fetch_assoc()) {
+        $user_profile_image = (string) ($u_row["profile_image"] ?? "");
+        $_SESSION["profile_image"] = $user_profile_image;
+    }
+}
 
 $stores = [];
 $store_home_pin = [
@@ -422,7 +430,11 @@ if (empty($sidebar_categories)) {
             <section class="menu-section">
                 <h3>User Account</h3>
                 <div class="user-card-info">
-                    <div class="user-avatar-circle"><?php echo strtoupper(substr($user_name, 0, 1)); ?></div>
+                    <?php if (!empty($user_profile_image) && file_exists(__DIR__ . "/uploads/profiles/" . $user_profile_image)): ?>
+                        <img class="user-avatar-circle user-avatar-img" src="uploads/profiles/<?php echo escape($user_profile_image); ?>" alt="Profile Photo" style="object-fit:cover; width:44px; height:44px; border-radius:50%; border:2px solid var(--primary);">
+                    <?php else: ?>
+                        <div class="user-avatar-circle"><?php echo strtoupper(substr($user_name, 0, 1)); ?></div>
+                    <?php endif; ?>
                     <div>
                         <p class="menu-user-name"><?php echo escape($user_name); ?></p>
                         <p class="menu-user-role"><?php echo $is_store ? "Store Account" : "Customer Account"; ?></p>

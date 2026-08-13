@@ -40,11 +40,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     }
 
     if (!$errors) {
-        $stmt = $mysqli->prepare("SELECT id, first_name, last_name, account_type, password_hash FROM users WHERE email = ? LIMIT 1");
+        $stmt = $mysqli->prepare("SELECT id, first_name, last_name, account_type, password_hash, profile_image FROM users WHERE email = ? LIMIT 1");
         if ($stmt) {
             $stmt->bind_param("s", $email_value);
             $stmt->execute();
-            $stmt->bind_result($id, $first_name, $last_name, $account_type, $password_hash);
+            $stmt->bind_result($id, $first_name, $last_name, $account_type, $password_hash, $profile_image);
             if ($stmt->fetch() && password_verify($password, $password_hash)) {
                 if ($account_type === "driver") {
                     $errors[] = "Use the delivery rider login page for rider accounts.";
@@ -53,6 +53,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     $_SESSION["user_id"] = $id;
                     $_SESSION["user_name"] = $first_name . " " . $last_name;
                     $_SESSION["account_type"] = $account_type;
+                    $_SESSION["profile_image"] = (string) ($profile_image ?? "");
                     if ($account_type === "admin") {
                         header("Location: admin/dashboard.php");
                         exit;

@@ -146,6 +146,55 @@ function fetch_driver_orders(mysqli $mysqli): array
     return array_values($orders);
 }
 
+function fetch_driver_earnings(mysqli $mysqli): array
+{
+    $today = date("Y-m-d");
+
+    // Today's completed deliveries
+    $todayRes = $mysqli->query(
+        "SELECT COUNT(*) AS cnt, COALESCE(SUM(delivery_fee), 0) AS total_fee
+         FROM orders
+         WHERE status = 'completed'
+           AND DATE(delivered_at) = '{$today}'
+           AND order_type = 'delivery'"
+    );
+    $todayRow = $todayRes ? $todayRes->fetch_assoc() : null;
+    $todayCount = (int) ($todayRow["cnt"] ?? 0);
+    $todayFee = (float) ($todayRow["total_fee"] ?? 0);
+
+    // This week (Mon–today)
+    $weekRes = $mysqli->query(
+        "SELECT COUNT(*) AS cnt, COALESCE(SUM(delivery_fee), 0) AS total_fee
+         FROM orders
+         WHERE status = 'completed'
+           AND YEARWEEK(delivered_at, 1) = YEARWEEK(CURRENT_DATE(), 1)
+           AND order_type = 'delivery'"
+    );
+    $weekRow = $weekRes ? $weekRes->fetch_assoc() : null;
+    $weekCount = (int) ($weekRow["cnt"] ?? 0);
+    $weekFee = (float) ($weekRow["total_fee"] ?? 0);
+
+    // All-time total deliveries completed
+    $allRes = $mysqli->query(
+        "SELECT COUNT(*) AS cnt, COALESCE(SUM(delivery_fee), 0) AS total_fee
+         FROM orders
+         WHERE status = 'completed'
+           AND order_type = 'delivery'"
+    );
+    $allRow = $allRes ? $allRes->fetch_assoc() : null;
+    $allCount = (int) ($allRow["cnt"] ?? 0);
+    $allFee = (float) ($allRow["total_fee"] ?? 0);
+
+    return [
+        "today_count" => $todayCount,
+        "today_fee" => $todayFee,
+        "week_count" => $weekCount,
+        "week_fee" => $weekFee,
+        "all_count" => $allCount,
+        "all_fee" => $allFee,
+    ];
+}
+
 function build_live_payload(mysqli $mysqli): array
 {
     $history = fetch_live_gps_history($mysqli, 30);
@@ -249,9 +298,19 @@ if (isset($_GET["format"]) && $_GET["format"] === "json") {
 $current = $payload["current"];
 $googleMapsUrl = build_google_maps_url($current);
 $driverName = $_SESSION["user_name"] ?? "Rider";
+$driverProfileImage = $_SESSION["profile_image"] ?? "";
+if ($driverProfileImage === "" && isset($_SESSION["user_id"])) {
+    $p_res = $conn->query("SELECT profile_image FROM users WHERE id = " . (int) $_SESSION["user_id"] . " LIMIT 1");
+    if ($p_res && $p_row = $p_res->fetch_assoc()) {
+        $driverProfileImage = (string) ($p_row["profile_image"] ?? "");
+        $_SESSION["profile_image"] = $driverProfileImage;
+    }
+}
+$earnings = fetch_driver_earnings($conn);
 ?>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -259,7 +318,8 @@ $driverName = $_SESSION["user_name"] ?? "Rider";
     <title>Driver Dashboard | Lokal</title>
     <link rel="stylesheet" href="assets/styles.css?v=primary-bw-icons-1">
     <link rel="stylesheet" href="assets/home.css?v=driver-clean-1">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
     <style>
         .driver-orders-sidebar {
             width: 380px;
@@ -328,10 +388,25 @@ $driverName = $_SESSION["user_name"] ?? "Rider";
             letter-spacing: 0.5px;
         }
 
-        .status-pending { background: #FEF3C7; color: #B45309; }
-        .status-for_pickup { background: #DBEAFE; color: #1D4ED8; }
-        .status-delivering { background: #D1FAE5; color: #047857; }
-        .status-completed { background: #F1F5F9; color: #475569; }
+        .status-pending {
+            background: #FEF3C7;
+            color: #B45309;
+        }
+
+        .status-for_pickup {
+            background: #DBEAFE;
+            color: #1D4ED8;
+        }
+
+        .status-delivering {
+            background: #D1FAE5;
+            color: #047857;
+        }
+
+        .status-completed {
+            background: #F1F5F9;
+            color: #475569;
+        }
 
         .driver-route-block {
             display: flex;
@@ -357,8 +432,13 @@ $driverName = $_SESSION["user_name"] ?? "Rider";
             flex-shrink: 0;
         }
 
-        .dot-store { background: var(--primary); }
-        .dot-customer { background: var(--secondary); }
+        .dot-store {
+            background: var(--primary);
+        }
+
+        .dot-customer {
+            background: var(--secondary);
+        }
 
         .driver-route-text {
             display: flex;
@@ -494,8 +574,209 @@ $driverName = $_SESSION["user_name"] ?? "Rider";
             border-color: var(--primary);
             transform: scale(1.05);
         }
+
+        /* ── Delivery Action & Success Modals ── */
+        .driver-modal-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 99999;
+            background: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(5px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .driver-modal-backdrop.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .driver-modal-card {
+            background: #FFFFFF;
+            border-radius: 22px;
+            padding: 32px 26px 26px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.3), 0 0 0 1px rgba(0, 0, 0, 0.06);
+            text-align: center;
+            transform: scale(0.92) translateY(12px);
+            transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .driver-modal-backdrop.open .driver-modal-card {
+            transform: scale(1) translateY(0);
+        }
+
+        .driver-modal-icon-wrap {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 18px;
+            flex-shrink: 0;
+        }
+
+        .driver-modal-icon-wrap.confirm-icon {
+            background: #EFF6FF;
+            color: #2563EB;
+            border: 2px solid #DBEAFE;
+        }
+
+        .driver-modal-icon-wrap.success-icon {
+            background: #ECFDF5;
+            color: #059669;
+            border: 2px solid #A7F3D0;
+        }
+
+        .driver-modal-title {
+            font-family: "Outfit", sans-serif;
+            font-size: 19px;
+            font-weight: 800;
+            color: #0F172A;
+            margin: 0 0 10px;
+            line-height: 1.35;
+        }
+
+        .driver-modal-desc {
+            font-size: 14px;
+            color: #64748B;
+            line-height: 1.55;
+            margin: 0 0 26px;
+        }
+
+        .driver-modal-actions {
+            display: flex;
+            gap: 12px;
+            width: 100%;
+        }
+
+        .driver-modal-btn {
+            flex: 1;
+            height: 46px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+            border: none;
+            text-decoration: none;
+        }
+
+        .driver-modal-btn.cancel {
+            background: #F1F5F9;
+            color: #475569;
+            border: 1px solid #E2E8F0;
+        }
+
+        .driver-modal-btn.cancel:hover {
+            background: #E2E8F0;
+            color: #0F172A;
+        }
+
+        .driver-modal-btn.confirm-delivery {
+            background: #10B981;
+            color: #FFFFFF;
+            box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+        }
+
+        .driver-modal-btn.confirm-delivery:hover {
+            background: #059669;
+            transform: translateY(-1px);
+        }
+
+        .driver-modal-btn.success-done {
+            background: #FF5B2E;
+            color: #FFFFFF;
+            box-shadow: 0 4px 14px rgba(255, 91, 46, 0.35);
+        }
+
+        .driver-modal-btn.success-done:hover {
+            background: #E0481D;
+            transform: translateY(-1px);
+        }
+
+        /* ── Earnings Panel ── */
+        .earnings-panel {
+            padding: 14px 16px 12px;
+            background: linear-gradient(135deg, #FF5B2E 0%, #E0431A 100%);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .earnings-panel-title {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.7px;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.75);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .earnings-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+        }
+
+        .earnings-card {
+            background: rgba(255, 255, 255, 0.14);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 12px;
+            padding: 10px 10px 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            cursor: default;
+            transition: background 0.15s;
+        }
+
+        .earnings-card:hover {
+            background: rgba(255, 255, 255, 0.22);
+        }
+
+        .earnings-card-label {
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .earnings-card-value {
+            font-family: "Outfit", sans-serif;
+            font-size: 16px;
+            font-weight: 800;
+            color: #FFFFFF;
+            line-height: 1.2;
+        }
+
+        .earnings-card-sub {
+            font-size: 10.5px;
+            color: rgba(255, 255, 255, 0.65);
+            font-weight: 500;
+        }
     </style>
 </head>
+
 <body class="home-screen account-driver">
     <div class="home-layout">
 
@@ -504,17 +785,49 @@ $driverName = $_SESSION["user_name"] ?? "Rider";
             <div class="sidebar-header">
                 <div class="sidebar-top-bar">
                     <h2 class="sidebar-title">Driver Orders</h2>
-                    <button type="button" id="sidebar-collapse-btn" class="sidebar-collapse-btn" title="Hide sidebar" aria-label="Hide sidebar">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <button type="button" id="sidebar-collapse-btn" class="sidebar-collapse-btn" title="Hide sidebar"
+                        aria-label="Hide sidebar">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+                            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="15 18 9 12 15 6"></polyline>
                         </svg>
                     </button>
                 </div>
 
+                <!-- ── Earnings Panel ── -->
+                <div class="earnings-panel" id="earnings-panel">
+                    <div class="earnings-grid">
+                        <div class="earnings-card">
+                            <span class="earnings-card-label">Today</span>
+                            <span class="earnings-card-value"
+                                id="earn-today-fee">₱<?php echo number_format($earnings["today_fee"], 2); ?></span>
+                            <span class="earnings-card-sub"><?php echo $earnings["today_count"]; ?>
+                                deliver<?php echo $earnings["today_count"] === 1 ? "y" : "ies"; ?></span>
+                        </div>
+                        <div class="earnings-card">
+                            <span class="earnings-card-label">This Week</span>
+                            <span class="earnings-card-value"
+                                id="earn-week-fee">₱<?php echo number_format($earnings["week_fee"], 2); ?></span>
+                            <span class="earnings-card-sub"><?php echo $earnings["week_count"]; ?>
+                                deliver<?php echo $earnings["week_count"] === 1 ? "y" : "ies"; ?></span>
+                        </div>
+                        <div class="earnings-card">
+                            <span class="earnings-card-label">All Time</span>
+                            <span class="earnings-card-value"
+                                id="earn-all-fee">₱<?php echo number_format($earnings["all_fee"], 2); ?></span>
+                            <span class="earnings-card-sub"><?php echo $earnings["all_count"]; ?>
+                                deliver<?php echo $earnings["all_count"] === 1 ? "y" : "ies"; ?></span>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="sidebar-search-row">
-                    <input type="text" id="driver-search-input" class="sidebar-search-input" placeholder="Search order #, customer, store" autocomplete="off">
-                    <button type="button" id="driver-refresh-btn" class="sidebar-locate-btn" title="Refresh data" aria-label="Refresh data">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <input type="text" id="driver-search-input" class="sidebar-search-input"
+                        placeholder="Search order #, customer, store" autocomplete="off">
+                    <button type="button" id="driver-refresh-btn" class="sidebar-locate-btn" title="Refresh data"
+                        aria-label="Refresh data">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="23 4 23 10 17 10"></polyline>
                             <polyline points="1 20 1 14 7 14"></polyline>
                             <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
@@ -540,22 +853,27 @@ $driverName = $_SESSION["user_name"] ?? "Rider";
         <main class="home-map-shell">
             <div id="home-map"></div>
 
-            <button id="sidebar-expand-btn" class="sidebar-expand-btn" type="button" aria-label="Show orders sidebar" hidden>
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <button id="sidebar-expand-btn" class="sidebar-expand-btn" type="button" aria-label="Show orders sidebar"
+                hidden>
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="9 18 15 12 9 6"></polyline>
                 </svg>
                 <span>Orders</span>
             </button>
 
             <!-- Recenter GPS Action Button -->
-            <button type="button" class="map-locate-action" id="map-recenter-btn" title="Center GPS location" aria-label="Center GPS location">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <button type="button" class="map-locate-action" id="map-recenter-btn" title="Center GPS location"
+                aria-label="Center GPS location">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
                     <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
                 </svg>
             </button>
 
             <!-- Navigation Drawer Toggle -->
-            <button id="menu-toggle" class="menu-toggle" type="button" aria-controls="menu-drawer" aria-expanded="false" aria-label="Open menu">
+            <button id="menu-toggle" class="menu-toggle" type="button" aria-controls="menu-drawer" aria-expanded="false"
+                aria-label="Open menu">
                 <span></span>
                 <span></span>
                 <span></span>
@@ -571,39 +889,79 @@ $driverName = $_SESSION["user_name"] ?? "Rider";
                 <section class="menu-section">
                     <h3>Rider Controls</h3>
                     <button type="button" class="menu-link" id="menu-center-live">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
+                            <circle cx="12" cy="9" r="2.5" />
+                        </svg>
                         <span>Center to latest GPS</span>
                     </button>
                     <button type="button" class="menu-link" id="menu-refresh-now">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+                        </svg>
                         <span>Refresh now</span>
                     </button>
-                    <a class="menu-link" id="menu-open-google" href="<?php echo escape_value($googleMapsUrl); ?>" target="_blank" rel="noopener" <?php echo $googleMapsUrl === "" ? 'aria-disabled="true"' : ""; ?>>
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+                    <a class="menu-link" id="menu-open-google" href="<?php echo escape_value($googleMapsUrl); ?>"
+                        target="_blank" rel="noopener" <?php echo $googleMapsUrl === "" ? 'aria-disabled="true"' : ""; ?>>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polygon points="3 11 22 2 13 21 11 13 3 11" />
+                        </svg>
                         <span>Open in Google Maps</span>
                     </a>
                 </section>
 
                 <section class="menu-section">
                     <h3>Live GPS Feed</h3>
-                    <p class="menu-meta" id="drawer-feed-status"><?php echo $current ? "Receiving GPS updates from gps_logs." : "No GPS rows with coordinates yet."; ?></p>
-                    <p class="menu-meta" id="drawer-device">Device: <?php echo escape_value(display_value($current["device"] ?? null)); ?></p>
-                    <p class="menu-meta" id="drawer-status">Status: <?php echo escape_value(display_value($current["status"] ?? null)); ?></p>
-                    <p class="menu-meta" id="drawer-device-time">Device time: <?php echo escape_value(display_value($current["device_time"] ?? null)); ?></p>
-                    <p class="menu-meta" id="drawer-server-time">Server time: <?php echo escape_value(display_value($current["created_at"] ?? null)); ?></p>
+                    <p class="menu-meta" id="drawer-feed-status">
+                        <?php echo $current ? "Receiving GPS updates from gps_logs." : "No GPS rows with coordinates yet."; ?>
+                    </p>
+                    <p class="menu-meta" id="drawer-device">Device:
+                        <?php echo escape_value(display_value($current["device"] ?? null)); ?>
+                    </p>
+                    <p class="menu-meta" id="drawer-status">Status:
+                        <?php echo escape_value(display_value($current["status"] ?? null)); ?>
+                    </p>
+                    <p class="menu-meta" id="drawer-device-time">Device time:
+                        <?php echo escape_value(display_value($current["device_time"] ?? null)); ?>
+                    </p>
+                    <p class="menu-meta" id="drawer-server-time">Server time:
+                        <?php echo escape_value(display_value($current["created_at"] ?? null)); ?>
+                    </p>
                 </section>
 
                 <section class="menu-section">
                     <h3>Account</h3>
                     <div class="user-card-info">
-                        <div class="user-avatar-circle"><?php echo strtoupper(substr($driverName, 0, 1)); ?></div>
+                        <?php if (!empty($driverProfileImage) && file_exists(__DIR__ . "/uploads/profiles/" . $driverProfileImage)): ?>
+                            <img class="user-avatar-circle user-avatar-img"
+                                src="uploads/profiles/<?php echo escape_value($driverProfileImage); ?>" alt="Driver Avatar"
+                                style="object-fit:cover; width:44px; height:44px; border-radius:50%; border:2px solid var(--primary);">
+                        <?php else: ?>
+                            <div class="user-avatar-circle"><?php echo strtoupper(substr($driverName, 0, 1)); ?></div>
+                        <?php endif; ?>
                         <div>
                             <p class="menu-user-name"><?php echo escape_value($driverName); ?></p>
                             <p class="menu-user-role">Delivery Rider</p>
                         </div>
                     </div>
+                    <a class="menu-link" href="account_profile.php">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                            <circle cx="12" cy="7" r="4" />
+                        </svg>
+                        <span>Profile & Documents</span>
+                    </a>
                     <a class="menu-link menu-logout" href="logout.php">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                            <polyline points="16 17 21 12 16 7" />
+                            <line x1="21" y1="12" x2="9" y2="12" />
+                        </svg>
                         <span>Log out</span>
                     </a>
                 </section>
@@ -613,13 +971,57 @@ $driverName = $_SESSION["user_name"] ?? "Rider";
         </main>
     </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- ── Delivery Confirm Modal ── -->
+    <div class="driver-modal-backdrop" id="delivery-confirm-modal" role="dialog" aria-modal="true"
+        aria-labelledby="confirm-modal-title">
+        <div class="driver-modal-card">
+            <h2 class="driver-modal-title" id="confirm-modal-title">Mark as Delivered?</h2>
+            <p class="driver-modal-desc" id="confirm-modal-desc">Please confirm that Order #<strong
+                    id="confirm-order-id">—</strong> has been successfully delivered to the customer.</p>
+            <div class="driver-modal-actions">
+                <button type="button" class="driver-modal-btn cancel" id="confirm-modal-cancel">Cancel</button>
+                <button type="button" class="driver-modal-btn confirm-delivery" id="confirm-modal-ok">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    Confirm Delivery
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Delivery Success Modal ── -->
+    <div class="driver-modal-backdrop" id="delivery-success-modal" role="dialog" aria-modal="true"
+        aria-labelledby="success-modal-title">
+        <div class="driver-modal-card">
+            <div class="driver-modal-icon-wrap success-icon">
+                <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                    <polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+            </div>
+            <h2 class="driver-modal-title" id="success-modal-title">Thank you for the delivery!</h2>
+            <p class="driver-modal-desc">Order #<strong id="success-order-id">—</strong> has been marked as delivered.
+                Great work!</p>
+            <div class="driver-modal-actions">
+                <button type="button" class="driver-modal-btn success-done" id="success-modal-done">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script>
         const livePayload = <?php echo json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
         const refreshIntervalMs = (livePayload.refresh_interval_seconds || 10) * 1000;
-        const defaultCenter = [14.5995, 120.9842];
+        const initGps = livePayload.current && livePayload.current.lat !== null && livePayload.current.lng !== null
+            ? [Number(livePayload.current.lat), Number(livePayload.current.lng)]
+            : [14.5995, 120.9842];
+        const initZoom = livePayload.current && livePayload.current.lat !== null ? 16 : 13;
 
-        const map = L.map("home-map", { zoomControl: false }).setView(defaultCenter, 13);
+        const map = L.map("home-map", { zoomControl: false }).setView(initGps, initZoom);
         L.control.zoom({ position: "bottomright" }).addTo(map);
 
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -628,7 +1030,7 @@ $driverName = $_SESSION["user_name"] ?? "Rider";
 
         const driverIcon = L.divIcon({
             className: "custom-marker",
-            html: `<div class="map-marker driver">
+            html: `<div class="map-marker driver rider">
                     <svg class="marker-svg" viewBox="0 0 24 24" aria-hidden="true">
                         <circle cx="6.5" cy="17.5" r="2.5"></circle>
                         <circle cx="17.5" cy="17.5" r="2.5"></circle>
@@ -638,35 +1040,35 @@ $driverName = $_SESSION["user_name"] ?? "Rider";
                         <path d="M10.5 10.5 14 7.5"></path>
                     </svg>
                 </div>`,
-            iconSize: [34, 34],
-            iconAnchor: [17, 34],
-            popupAnchor: [0, -30]
+            iconSize: [38, 38],
+            iconAnchor: [19, 19],
+            popupAnchor: [0, -22]
         });
 
         const storeIcon = L.divIcon({
             className: "custom-marker",
-            html: `<div class="map-marker" style="background:#FFFFFF; color:var(--primary); border-color:var(--primary);">
+            html: `<div class="map-marker store-home" style="background:#FFFFFF; color:var(--primary); border-color:var(--primary);">
                     <svg class="marker-svg" viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
                         <polyline points="9 22 9 12 15 12 15 22"></polyline>
                     </svg>
                 </div>`,
-            iconSize: [34, 34],
-            iconAnchor: [17, 34],
-            popupAnchor: [0, -30]
+            iconSize: [38, 38],
+            iconAnchor: [19, 19],
+            popupAnchor: [0, -22]
         });
 
         const customerIcon = L.divIcon({
             className: "custom-marker",
-            html: `<div class="map-marker" style="background:#FFFFFF; color:var(--secondary); border-color:var(--secondary);">
+            html: `<div class="map-marker customer user" style="background:#FFFFFF; color:var(--secondary); border-color:var(--secondary);">
                     <svg class="marker-svg" viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
                         <circle cx="12" cy="10" r="3"></circle>
                     </svg>
                 </div>`,
-            iconSize: [34, 34],
-            iconAnchor: [17, 34],
-            popupAnchor: [0, -30]
+            iconSize: [38, 38],
+            iconAnchor: [19, 19],
+            popupAnchor: [0, -22]
         });
 
         const menuDrawer = document.getElementById("menu-drawer");
@@ -809,6 +1211,35 @@ $driverName = $_SESSION["user_name"] ?? "Rider";
             }
         }
 
+        function updateEarningsTodayLive(addedFee) {
+            const todayFeeEl = document.getElementById("earn-today-fee");
+            const todaySubEl = todayFeeEl ? todayFeeEl.nextElementSibling : null;
+            if (!todayFeeEl) return;
+
+            // Parse current value (strip ₱ and commas)
+            const currentFee = parseFloat(todayFeeEl.textContent.replace(/[^\d.]/g, "")) || 0;
+            const newFee = currentFee + addedFee;
+            todayFeeEl.textContent = "₱" + newFee.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            // Increment delivery count
+            if (todaySubEl) {
+                const match = todaySubEl.textContent.match(/\d+/);
+                const oldCount = match ? parseInt(match[0], 10) : 0;
+                const newCount = oldCount + 1;
+                todaySubEl.textContent = `${newCount} deliver${newCount === 1 ? "y" : "ies"}`;
+            }
+
+            // Flash animation
+            if (todayFeeEl.closest) {
+                const card = todayFeeEl.closest(".earnings-card");
+                if (card) {
+                    card.style.transition = "background 0.2s";
+                    card.style.background = "rgba(255,255,255,0.40)";
+                    setTimeout(() => { card.style.background = ""; }, 700);
+                }
+            }
+        }
+
         function renderOrders(orders) {
             if (!ordersListEl) return;
             const list = Array.isArray(orders) ? orders : [];
@@ -911,26 +1342,75 @@ $driverName = $_SESSION["user_name"] ?? "Rider";
             latestPayload = payload;
             const current = payload.current;
 
-            if (current && current.lat !== null && current.lng !== null) {
-                hudStatusText.textContent = `GPS Connected (${current.device || "Unit"})`;
-                liveIndicatorDot.style.background = "#10B981";
-
+            if (current && current.lat !== null && current.lng !== null && Number(current.lat) !== 0) {
                 const latLng = [Number(current.lat), Number(current.lng)];
                 if (liveMarker) {
                     liveMarker.setLatLng(latLng);
                 } else {
-                    liveMarker = L.marker(latLng, { icon: driverIcon }).addTo(map)
-                        .bindPopup("<strong>Your Location</strong>");
+                    liveMarker = L.marker(latLng, { icon: driverIcon, zIndexOffset: 1000 }).addTo(map)
+                        .bindPopup("<strong>Driver Location</strong>");
                 }
 
                 if (!hasCenteredInitially || forceCenter) {
-                    map.setView(latLng, 15);
+                    map.setView(latLng, 16);
                     hasCenteredInitially = true;
                 }
             }
 
             renderOrders(payload.orders || []);
         }
+
+        // ── Modal helpers ──
+        const confirmModal = document.getElementById("delivery-confirm-modal");
+        const successModal = document.getElementById("delivery-success-modal");
+        const confirmOrderId = document.getElementById("confirm-order-id");
+        const successOrderId = document.getElementById("success-order-id");
+        const confirmOkBtn = document.getElementById("confirm-modal-ok");
+        const confirmCancel = document.getElementById("confirm-modal-cancel");
+        const successDone = document.getElementById("success-modal-done");
+        let pendingDeliveryOrderId = null;
+
+        function openModal(el) {
+            el.classList.add("open");
+            el.focus && el.focus();
+        }
+        function closeModal(el) {
+            el.classList.remove("open");
+        }
+
+        // Close confirm modal on cancel
+        confirmCancel.addEventListener("click", () => closeModal(confirmModal));
+        confirmModal.addEventListener("click", (e) => {
+            if (e.target === confirmModal) closeModal(confirmModal);
+        });
+
+        // Confirm delivery action
+        confirmOkBtn.addEventListener("click", () => {
+            if (pendingDeliveryOrderId === null) return;
+            closeModal(confirmModal);
+            confirmOkBtn.disabled = true;
+            confirmOkBtn.textContent = "Marking…";
+            submitOrderAction(pendingDeliveryOrderId, "complete");
+        });
+
+        // Success modal done → reload
+        successDone.addEventListener("click", () => {
+            closeModal(successModal);
+            window.location.reload();
+        });
+        successModal.addEventListener("click", (e) => {
+            if (e.target === successModal) {
+                closeModal(successModal);
+                window.location.reload();
+            }
+        });
+
+        // ESC closes any open modal
+        document.addEventListener("keydown", (e) => {
+            if (e.key !== "Escape") return;
+            if (confirmModal.classList.contains("open")) closeModal(confirmModal);
+            if (successModal.classList.contains("open")) { closeModal(successModal); window.location.reload(); }
+        });
 
         async function submitOrderAction(orderId, action) {
             try {
@@ -941,18 +1421,31 @@ $driverName = $_SESSION["user_name"] ?? "Rider";
                 });
                 const data = await res.json();
                 if (!res.ok || !data.ok) {
+                    // Re-enable confirm button if failed
+                    confirmOkBtn.disabled = false;
+                    confirmOkBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Confirm Delivery`;
                     alert(data.message || "Failed to update order");
                     return;
                 }
                 if (action === "complete") {
                     selectedOrderId = null;
                     clearRoute();
-                    alert("Thank you for the delivery!");
-                    window.location.reload();
+                    // Reset confirm button state
+                    confirmOkBtn.disabled = false;
+                    confirmOkBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Confirm Delivery`;
+                    // Update earnings panel with delivery fee from completed order
+                    const completedOrder = (data.payload?.orders || latestPayload?.orders || []).find(o => o.id === orderId);
+                    const fee = completedOrder ? (completedOrder.delivery_fee || 0) : 0;
+                    updateEarningsTodayLive(fee);
+                    // Show success modal
+                    successOrderId.textContent = orderId;
+                    openModal(successModal);
                     return;
                 }
                 renderLiveData(data.payload || latestPayload);
             } catch (err) {
+                confirmOkBtn.disabled = false;
+                confirmOkBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Confirm Delivery`;
                 alert("Network error updating order.");
             }
         }
@@ -995,6 +1488,21 @@ $driverName = $_SESSION["user_name"] ?? "Rider";
         document.getElementById("map-recenter-btn").addEventListener("click", () => {
             if (liveMarker) {
                 map.flyTo(liveMarker.getLatLng(), 16, { duration: 0.5 });
+            } else if (latestPayload.current && latestPayload.current.lat !== null) {
+                map.flyTo([Number(latestPayload.current.lat), Number(latestPayload.current.lng)], 16, { duration: 0.5 });
+            } else if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition((pos) => {
+                    const latLng = [pos.coords.latitude, pos.coords.longitude];
+                    if (liveMarker) {
+                        liveMarker.setLatLng(latLng);
+                    } else {
+                        liveMarker = L.marker(latLng, { icon: driverIcon, zIndexOffset: 1000 }).addTo(map)
+                            .bindPopup("<strong>Driver Location (GPS)</strong>");
+                    }
+                    map.flyTo(latLng, 16, { duration: 0.5 });
+                }, (err) => {
+                    console.warn("Geolocation error:", err);
+                }, { enableHighAccuracy: true });
             }
         });
 
@@ -1042,9 +1550,9 @@ $driverName = $_SESSION["user_name"] ?? "Rider";
                 }
 
                 if (action === "complete") {
-                    if (confirm(`Mark Order #${orderId} as Delivered?`)) {
-                        submitOrderAction(orderId, action);
-                    }
+                    pendingDeliveryOrderId = orderId;
+                    confirmOrderId.textContent = orderId;
+                    openModal(confirmModal);
                     return;
                 }
 
@@ -1066,9 +1574,13 @@ $driverName = $_SESSION["user_name"] ?? "Rider";
         });
 
         renderLiveData(livePayload, true);
+        window.setTimeout(() => {
+            map.invalidateSize();
+        }, 200);
         setInterval(() => {
             fetchFreshData(false);
         }, refreshIntervalMs);
     </script>
 </body>
+
 </html>

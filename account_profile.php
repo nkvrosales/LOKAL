@@ -10,49 +10,63 @@ if ($accountType === "admin") {
     exit;
 }
 $isStore = $accountType === "store";
+$isDriver = $accountType === "driver";
 $errors = [];
 $notice = "";
 
 $profile = [
-    "first_name"     => "",
-    "middle_name"    => "",
-    "last_name"      => "",
-    "contact"        => "",
-    "email"          => "",
-    "user_address"   => "",
-    "user_lat"       => "",
-    "user_lng"       => "",
-    "store_name"     => "",
-    "store_contact"  => "",
-    "store_address"  => "",
-    "store_lat"      => "",
-    "store_lng"      => "",
-    "store_category" => "",
+    "first_name"            => "",
+    "middle_name"           => "",
+    "last_name"             => "",
+    "contact"               => "",
+    "email"                 => "",
+    "user_address"          => "",
+    "user_lat"              => "",
+    "user_lng"              => "",
+    "store_name"            => "",
+    "store_contact"         => "",
+    "store_address"         => "",
+    "store_lat"             => "",
+    "store_lng"             => "",
+    "store_category"        => "",
+    "vehicle_registration"  => "",
+    "id_image"              => "",
+    "orcr_image"            => "",
+    "profile_image"         => "",
+    "is_approved"           => 0,
+    "created_at"            => "",
 ];
 
 function load_account_profile(mysqli $mysqli, int $userId): array
 {
     $profile = [
-        "first_name"     => "",
-        "middle_name"    => "",
-        "last_name"      => "",
-        "contact"        => "",
-        "email"          => "",
-        "user_address"   => "",
-        "user_lat"       => "",
-        "user_lng"       => "",
-        "store_name"     => "",
-        "store_contact"  => "",
-        "store_address"  => "",
-        "store_lat"      => "",
-        "store_lng"      => "",
-        "store_category" => "",
+        "first_name"            => "",
+        "middle_name"           => "",
+        "last_name"             => "",
+        "contact"               => "",
+        "email"                 => "",
+        "user_address"          => "",
+        "user_lat"              => "",
+        "user_lng"              => "",
+        "store_name"            => "",
+        "store_contact"         => "",
+        "store_address"         => "",
+        "store_lat"             => "",
+        "store_lng"             => "",
+        "store_category"        => "",
+        "vehicle_registration"  => "",
+        "id_image"              => "",
+        "orcr_image"            => "",
+        "profile_image"         => "",
+        "is_approved"           => 0,
+        "created_at"            => "",
     ];
 
     $stmt = $mysqli->prepare(
         "SELECT first_name, middle_name, last_name, contact, email,
                 user_address, user_lat, user_lng,
-                store_name, store_contact, store_address, store_lat, store_lng, store_category
+                store_name, store_contact, store_address, store_lat, store_lng, store_category,
+                vehicle_registration, id_image, orcr_image, profile_image, is_approved, created_at
          FROM users
          WHERE id = ?
          LIMIT 1"
@@ -77,24 +91,36 @@ function load_account_profile(mysqli $mysqli, int $userId): array
         $storeAddress,
         $storeLat,
         $storeLng,
-        $storeCategory
+        $storeCategory,
+        $vehicleReg,
+        $idImage,
+        $orcrImage,
+        $profileImage,
+        $isApproved,
+        $createdAt
     );
     if ($stmt->fetch()) {
         $profile = [
-            "first_name"     => trim((string) ($firstName ?? "")),
-            "middle_name"    => trim((string) ($middleName ?? "")),
-            "last_name"      => trim((string) ($lastName ?? "")),
-            "contact"        => trim((string) ($contact ?? "")),
-            "email"          => trim((string) ($email ?? "")),
-            "user_address"   => trim((string) ($userAddress ?? "")),
-            "user_lat"       => $userLat !== null ? (string) $userLat : "",
-            "user_lng"       => $userLng !== null ? (string) $userLng : "",
-            "store_name"     => trim((string) ($storeName ?? "")),
-            "store_contact"  => trim((string) ($storeContact ?? "")),
-            "store_address"  => trim((string) ($storeAddress ?? "")),
-            "store_lat"      => $storeLat !== null ? (string) $storeLat : "",
-            "store_lng"      => $storeLng !== null ? (string) $storeLng : "",
-            "store_category" => trim((string) ($storeCategory ?? "")),
+            "first_name"            => trim((string) ($firstName ?? "")),
+            "middle_name"           => trim((string) ($middleName ?? "")),
+            "last_name"             => trim((string) ($lastName ?? "")),
+            "contact"               => trim((string) ($contact ?? "")),
+            "email"                 => trim((string) ($email ?? "")),
+            "user_address"          => trim((string) ($userAddress ?? "")),
+            "user_lat"              => $userLat !== null ? (string) $userLat : "",
+            "user_lng"              => $userLng !== null ? (string) $userLng : "",
+            "store_name"            => trim((string) ($storeName ?? "")),
+            "store_contact"         => trim((string) ($storeContact ?? "")),
+            "store_address"         => trim((string) ($storeAddress ?? "")),
+            "store_lat"             => $storeLat !== null ? (string) $storeLat : "",
+            "store_lng"             => $storeLng !== null ? (string) $storeLng : "",
+            "store_category"        => trim((string) ($storeCategory ?? "")),
+            "vehicle_registration"  => trim((string) ($vehicleReg ?? "")),
+            "id_image"              => trim((string) ($idImage ?? "")),
+            "orcr_image"            => trim((string) ($orcrImage ?? "")),
+            "profile_image"         => trim((string) ($profileImage ?? "")),
+            "is_approved"           => (int) ($isApproved ?? 0),
+            "created_at"            => (string) ($createdAt ?? ""),
         ];
     }
     $stmt->close();
@@ -118,6 +144,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         foreach (["store_name", "store_contact", "store_address", "store_lat", "store_lng", "store_category"] as $field) {
             $profile[$field] = trim($_POST[$field] ?? "");
         }
+    } elseif ($isDriver) {
+        $profile["vehicle_registration"] = trim($_POST["vehicle_registration"] ?? "");
     } else {
         foreach (["user_address", "user_lat", "user_lng"] as $field) {
             $profile[$field] = trim($_POST[$field] ?? "");
@@ -150,12 +178,81 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         if ($profile["store_lat"] === "" || $profile["store_lng"] === "" || !is_numeric($profile["store_lat"]) || !is_numeric($profile["store_lng"])) {
             $errors[] = "Pin a valid store location on the map.";
         }
+    } elseif ($isDriver) {
+        if ($profile["vehicle_registration"] === "") {
+            $errors[] = "Vehicle registration details are required.";
+        }
     } else {
         if ($profile["user_address"] === "") {
             $errors[] = "Delivery address is required.";
         }
         if ($profile["user_lat"] === "" || $profile["user_lng"] === "" || !is_numeric($profile["user_lat"]) || !is_numeric($profile["user_lng"])) {
             $errors[] = "Pin a valid delivery location on the map.";
+        }
+    }
+
+    // Handle Profile Photo Upload (Riders and Users)
+    $newProfileImage = $profile["profile_image"];
+    $allowedExts = ["jpg", "jpeg", "png", "webp"];
+
+    if (isset($_FILES["profile_image"]) && is_uploaded_file($_FILES["profile_image"]["tmp_name"])) {
+        $origName = $_FILES["profile_image"]["name"];
+        $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
+        if (!in_array($ext, $allowedExts, true)) {
+            $errors[] = "Profile photo must be JPG, PNG, or WEBP.";
+        } else {
+            $uploadsDirProfiles = __DIR__ . DIRECTORY_SEPARATOR . "uploads" . DIRECTORY_SEPARATOR . "profiles";
+            if (!is_dir($uploadsDirProfiles)) @mkdir($uploadsDirProfiles, 0777, true);
+            $newProfileFilename = bin2hex(random_bytes(8)) . "_" . time() . "." . $ext;
+            $dest = $uploadsDirProfiles . DIRECTORY_SEPARATOR . $newProfileFilename;
+            if (move_uploaded_file($_FILES["profile_image"]["tmp_name"], $dest)) {
+                $newProfileImage = $newProfileFilename;
+            }
+        }
+    }
+
+    // Profile photo is strictly required for riders
+    if ($isDriver && empty($newProfileImage)) {
+        $errors[] = "Profile photo is required for delivery riders.";
+    }
+
+    // Handle Driver ID & ORCR File Uploads
+    $newIdImage = $profile["id_image"];
+    $newOrcrImage = $profile["orcr_image"];
+
+    if ($isDriver && !$errors) {
+        // Handle ID image
+        if (isset($_FILES["id_image"]) && is_uploaded_file($_FILES["id_image"]["tmp_name"])) {
+            $origName = $_FILES["id_image"]["name"];
+            $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
+            if (!in_array($ext, $allowedExts, true)) {
+                $errors[] = "Valid ID image must be JPG, PNG, or WEBP.";
+            } else {
+                $uploadsDir = __DIR__ . DIRECTORY_SEPARATOR . "uploads" . DIRECTORY_SEPARATOR . "ids";
+                if (!is_dir($uploadsDir)) @mkdir($uploadsDir, 0777, true);
+                $newIdFilename = bin2hex(random_bytes(8)) . "_" . time() . "." . $ext;
+                $dest = $uploadsDir . DIRECTORY_SEPARATOR . $newIdFilename;
+                if (move_uploaded_file($_FILES["id_image"]["tmp_name"], $dest)) {
+                    $newIdImage = $newIdFilename;
+                }
+            }
+        }
+
+        // Handle ORCR image
+        if (isset($_FILES["orcr_image"]) && is_uploaded_file($_FILES["orcr_image"]["tmp_name"])) {
+            $origName2 = $_FILES["orcr_image"]["name"];
+            $ext2 = strtolower(pathinfo($origName2, PATHINFO_EXTENSION));
+            if (!in_array($ext2, $allowedExts, true)) {
+                $errors[] = "OR/CR document image must be JPG, PNG, or WEBP.";
+            } else {
+                $uploadsDir2 = __DIR__ . DIRECTORY_SEPARATOR . "uploads" . DIRECTORY_SEPARATOR . "orcr";
+                if (!is_dir($uploadsDir2)) @mkdir($uploadsDir2, 0777, true);
+                $newOrcrFilename = bin2hex(random_bytes(8)) . "_" . time() . "." . $ext2;
+                $dest2 = $uploadsDir2 . DIRECTORY_SEPARATOR . $newOrcrFilename;
+                if (move_uploaded_file($_FILES["orcr_image"]["tmp_name"], $dest2)) {
+                    $newOrcrImage = $newOrcrFilename;
+                }
+            }
         }
     }
 
@@ -205,12 +302,30 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 "UPDATE users
                  SET first_name = ?, middle_name = ?, last_name = ?, contact = ?, email = ?,
                      store_name = ?, store_contact = ?, store_address = ?, store_lat = ?, store_lng = ?,
-                     store_category = ?
+                     store_category = ?, profile_image = ?
                      {$passwordSql}
                  WHERE id = ?"
             );
             if ($stmt) {
                 if ($shouldChangePassword) {
+                    $stmt->bind_param(
+                        "ssssssssddssssi",
+                        $profile["first_name"],
+                        $profile["middle_name"],
+                        $profile["last_name"],
+                        $profile["contact"],
+                        $profile["email"],
+                        $profile["store_name"],
+                        $profile["store_contact"],
+                        $profile["store_address"],
+                        $lat,
+                        $lng,
+                        $storeCat,
+                        $newProfileImage,
+                        $newHash,
+                        $userId
+                    );
+                } else {
                     $stmt->bind_param(
                         "ssssssssddssi",
                         $profile["first_name"],
@@ -224,23 +339,47 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         $lat,
                         $lng,
                         $storeCat,
-                        $newHash,
+                        $newProfileImage,
                         $userId
                     );
-                } else {
+                }
+            }
+        } elseif ($isDriver) {
+            $stmt = $mysqli->prepare(
+                "UPDATE users
+                 SET first_name = ?, middle_name = ?, last_name = ?, contact = ?, email = ?,
+                     vehicle_registration = ?, id_image = ?, orcr_image = ?, profile_image = ?
+                     {$passwordSql}
+                 WHERE id = ?"
+            );
+            if ($stmt) {
+                if ($shouldChangePassword) {
                     $stmt->bind_param(
-                        "ssssssssddsi",
+                        "ssssssssssi",
                         $profile["first_name"],
                         $profile["middle_name"],
                         $profile["last_name"],
                         $profile["contact"],
                         $profile["email"],
-                        $profile["store_name"],
-                        $profile["store_contact"],
-                        $profile["store_address"],
-                        $lat,
-                        $lng,
-                        $storeCat,
+                        $profile["vehicle_registration"],
+                        $newIdImage,
+                        $newOrcrImage,
+                        $newProfileImage,
+                        $newHash,
+                        $userId
+                    );
+                } else {
+                    $stmt->bind_param(
+                        "sssssssssi",
+                        $profile["first_name"],
+                        $profile["middle_name"],
+                        $profile["last_name"],
+                        $profile["contact"],
+                        $profile["email"],
+                        $profile["vehicle_registration"],
+                        $newIdImage,
+                        $newOrcrImage,
+                        $newProfileImage,
                         $userId
                     );
                 }
@@ -251,12 +390,27 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $stmt = $mysqli->prepare(
                 "UPDATE users
                  SET first_name = ?, middle_name = ?, last_name = ?, contact = ?, email = ?,
-                     user_address = ?, user_lat = ?, user_lng = ?
+                     user_address = ?, user_lat = ?, user_lng = ?, profile_image = ?
                      {$passwordSql}
                  WHERE id = ?"
             );
             if ($stmt) {
                 if ($shouldChangePassword) {
+                    $stmt->bind_param(
+                        "ssssssddssi",
+                        $profile["first_name"],
+                        $profile["middle_name"],
+                        $profile["last_name"],
+                        $profile["contact"],
+                        $profile["email"],
+                        $profile["user_address"],
+                        $lat,
+                        $lng,
+                        $newProfileImage,
+                        $newHash,
+                        $userId
+                    );
+                } else {
                     $stmt->bind_param(
                         "ssssssddsi",
                         $profile["first_name"],
@@ -267,20 +421,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         $profile["user_address"],
                         $lat,
                         $lng,
-                        $newHash,
-                        $userId
-                    );
-                } else {
-                    $stmt->bind_param(
-                        "ssssssddi",
-                        $profile["first_name"],
-                        $profile["middle_name"],
-                        $profile["last_name"],
-                        $profile["contact"],
-                        $profile["email"],
-                        $profile["user_address"],
-                        $lat,
-                        $lng,
+                        $newProfileImage,
                         $userId
                     );
                 }
@@ -289,7 +430,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         if (isset($stmt) && $stmt && $stmt->execute()) {
             $_SESSION["user_name"] = trim($profile["first_name"] . " " . $profile["last_name"]);
-            $notice = $shouldChangePassword ? "Profile and password updated." : "Profile updated.";
+            $_SESSION["profile_image"] = (string) $newProfileImage;
+            $notice = $shouldChangePassword ? "Profile and password updated successfully." : "Profile updated successfully.";
             $profile = load_account_profile($mysqli, $userId);
         } else {
             $errors[] = "Unable to update profile. Please try again.";
@@ -300,17 +442,19 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     }
 }
 
-$mapLat = $isStore ? $profile["store_lat"] : $profile["user_lat"];
-$mapLng = $isStore ? $profile["store_lng"] : $profile["user_lng"];
+$mapLat = $isStore ? $profile["store_lat"] : ($isDriver ? "" : $profile["user_lat"]);
+$mapLng = $isStore ? $profile["store_lng"] : ($isDriver ? "" : $profile["user_lng"]);
 
 // Fetch active categories for profile dropdown
 $prof_categories = [];
-$pcat = $mysqli->query("SELECT name, slug FROM categories WHERE is_active = 1 ORDER BY sort_order ASC, name ASC");
-if ($pcat) {
-    while ($pc = $pcat->fetch_assoc()) {
-        $prof_categories[] = ["name" => $pc["name"], "slug" => $pc["slug"]];
+if ($isStore) {
+    $pcat = $mysqli->query("SELECT name, slug FROM categories WHERE is_active = 1 ORDER BY sort_order ASC, name ASC");
+    if ($pcat) {
+        while ($pc = $pcat->fetch_assoc()) {
+            $prof_categories[] = ["name" => $pc["name"], "slug" => $pc["slug"]];
+        }
+        $pcat->close();
     }
-    $pcat->close();
 }
 ?>
 <!DOCTYPE html>
@@ -322,8 +466,120 @@ if ($pcat) {
     <title>Account Profile | Lokal</title>
     <link rel="stylesheet" href="assets/styles.css?v=primary-bw-icons-1">
     <link rel="stylesheet" href="assets/store-admin.css?v=hover-effects-1">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    <?php if (!$isDriver): ?>
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    <?php endif; ?>
     <style>
+        .profile-photo-upload-row {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 16px;
+            background: #F8FAFC;
+            border: 1.5px solid #E2E8F0;
+            border-radius: 14px;
+            margin-bottom: 20px;
+        }
+        .profile-photo-preview-box {
+            position: relative;
+            width: 84px;
+            height: 84px;
+            border-radius: 50%;
+            overflow: hidden;
+            background: #FF5B2E;
+            color: #FFFFFF;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            font-weight: 800;
+            flex-shrink: 0;
+            border: 3px solid #FFFFFF;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+        }
+        .profile-photo-preview-box img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .profile-photo-info {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            flex: 1;
+        }
+        .profile-photo-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #0F172A;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .photo-req-tag {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 999px;
+        }
+        .photo-req-tag.required {
+            background: #FEE2E2;
+            color: #DC2626;
+        }
+        .photo-req-tag.optional {
+            background: #E2E8F0;
+            color: #475569;
+        }
+        .driver-doc-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        .driver-doc-card {
+            background: #F8FAFC;
+            border: 1.5px solid #E2E8F0;
+            border-radius: 14px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .driver-doc-card label {
+            font-weight: 700;
+            font-size: 13.5px;
+            color: #0F172A;
+            margin: 0;
+        }
+        .driver-doc-thumb {
+            width: 100%;
+            height: 140px;
+            object-fit: cover;
+            border-radius: 10px;
+            border: 1px solid #CBD5E1;
+            background: #FFFFFF;
+        }
+        .driver-status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 999px;
+            font-size: 12.5px;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+        .driver-status-badge.approved {
+            background: #D1FAE5;
+            color: #047857;
+            border: 1px solid #A7F3D0;
+        }
+        .driver-status-badge.pending {
+            background: #FEF3C7;
+            color: #B45309;
+            border: 1px solid #FDE68A;
+        }
         .address-autofill-wrap {
             position: relative;
         }
@@ -399,32 +655,43 @@ if ($pcat) {
 </head>
 <body class="store-admin-body">
     <header class="top-bar">
-        <a class="logo" href="home.php" style="text-decoration:none">
+        <a class="logo" href="<?php echo $isDriver ? 'driver_dashboard.php' : 'home.php'; ?>" style="text-decoration:none">
             <span style="color:var(--primary, #FF4D2E)">LOKAL</span>
         </a>
         <nav class="store-admin-nav" aria-label="Account pages">
-            <a class="store-admin-tab" href="home.php">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-                <span>Home</span>
-            </a>
-            <a class="store-admin-tab active" href="account_profile.php">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                <span>Profile</span>
-            </a>
-            <a class="store-admin-tab" href="order_history.php">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                <span>Order History</span>
-            </a>
-            <?php if ($isStore): ?>
-                <a class="store-admin-tab" href="store_products.php">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
-                    <span>Product</span>
+            <?php if ($isDriver): ?>
+                <a class="store-admin-tab" href="driver_dashboard.php">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6.5" cy="17.5" r="2.5"></circle><circle cx="17.5" cy="17.5" r="2.5"></circle><path d="M9 7H6"></path><path d="M8.5 10.5 11 17.5"></path><path d="M11 10.5h4l2.5 7"></path><path d="M10.5 10.5 14 7.5"></path></svg>
+                    <span>Dashboard</span>
+                </a>
+                <a class="store-admin-tab active" href="account_profile.php">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    <span>Profile</span>
                 </a>
             <?php else: ?>
-                <a class="store-admin-tab" href="cart.php">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.8"/><circle cx="18" cy="20" r="1.8"/><path d="M3 4h2.5l2.2 11.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 8H7"/></svg>
-                    <span>Cart</span>
+                <a class="store-admin-tab" href="home.php">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    <span>Home</span>
                 </a>
+                <a class="store-admin-tab active" href="account_profile.php">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    <span>Profile</span>
+                </a>
+                <a class="store-admin-tab" href="order_history.php">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    <span>Order History</span>
+                </a>
+                <?php if ($isStore): ?>
+                    <a class="store-admin-tab" href="store_products.php">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                        <span>Product</span>
+                    </a>
+                <?php else: ?>
+                    <a class="store-admin-tab" href="cart.php">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.8"/><circle cx="18" cy="20" r="1.8"/><path d="M3 4h2.5l2.2 11.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 8H7"/></svg>
+                        <span>Cart</span>
+                    </a>
+                <?php endif; ?>
             <?php endif; ?>
             <a class="store-admin-tab" href="logout.php">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -435,8 +702,16 @@ if ($pcat) {
 
     <main class="store-admin-shell">
         <section class="store-admin-card">
-            <h1><?php echo $isStore ? "Store Profile" : "User Profile"; ?></h1>
-            <p class="status-text">Update your account details and saved map location. Enter your current password to save changes. New password is optional.</p>
+            <h1><?php echo $isDriver ? "Driver Profile" : ($isStore ? "Store Profile" : "User Profile"); ?></h1>
+            <p class="status-text"><?php echo $isDriver ? "Manage your delivery rider profile photo, vehicle info, identification documents, and security." : "Update your account details, profile photo, and saved map location."; ?></p>
+
+            <?php if ($isDriver): ?>
+                <?php if ((int)$profile["is_approved"] === 1): ?>
+                    <div class="driver-status-badge approved">✓ Approved Delivery Rider</div>
+                <?php else: ?>
+                    <div class="driver-status-badge pending">⏳ Account Pending Admin Approval</div>
+                <?php endif; ?>
+            <?php endif; ?>
 
             <?php if ($notice !== ""): ?>
                 <div class="notice success"><?php echo escape($notice); ?></div>
@@ -449,7 +724,31 @@ if ($pcat) {
                 </div>
             <?php endif; ?>
 
-            <form method="post" class="form-stack">
+            <form method="post" enctype="multipart/form-data" class="form-stack">
+                <!-- Profile Photo Upload -->
+                <div class="profile-photo-upload-row">
+                    <div class="profile-photo-preview-box" id="avatar-preview-box">
+                        <?php if (!empty($profile["profile_image"]) && file_exists(__DIR__ . "/uploads/profiles/" . $profile["profile_image"])): ?>
+                            <img id="avatar-preview-img" src="uploads/profiles/<?php echo escape($profile["profile_image"]); ?>" alt="Profile Photo">
+                        <?php else: ?>
+                            <span id="avatar-preview-initial"><?php echo strtoupper(substr($profile["first_name"] ?: "U", 0, 1)); ?></span>
+                            <img id="avatar-preview-img" src="" alt="Profile Photo" style="display:none;">
+                        <?php endif; ?>
+                    </div>
+                    <div class="profile-photo-info">
+                        <div class="profile-photo-title">
+                            <span>Profile Photo</span>
+                            <?php if ($isDriver): ?>
+                                <span class="photo-req-tag required">*Required for Riders</span>
+                            <?php else: ?>
+                                <span class="photo-req-tag optional">(Optional)</span>
+                            <?php endif; ?>
+                        </div>
+                        <input type="file" id="profile_image" name="profile_image" accept="image/*" onchange="previewProfilePhoto(event)">
+                        <small style="color:#64748B;">Supported: JPG, PNG, WEBP. Max 5MB.</small>
+                    </div>
+                </div>
+
                 <div class="split">
                     <div class="field">
                         <label for="first_name">First name</label>
@@ -465,7 +764,7 @@ if ($pcat) {
                     <input type="text" id="last_name" name="last_name" value="<?php echo escape($profile["last_name"]); ?>" required>
                 </div>
                 <div class="field">
-                    <label for="contact">Contact</label>
+                    <label for="contact">Contact Number</label>
                     <input type="text" id="contact" name="contact" value="<?php echo escape($profile["contact"]); ?>" required>
                 </div>
                 <div class="field">
@@ -473,7 +772,38 @@ if ($pcat) {
                     <input type="email" id="email" name="email" value="<?php echo escape($profile["email"]); ?>" required>
                 </div>
 
-                <?php if ($isStore): ?>
+                <?php if ($isDriver): ?>
+                    <h2>Vehicle & Verification Documents</h2>
+                    <div class="field">
+                        <label for="vehicle_registration">Vehicle Registration / Plate Number</label>
+                        <input type="text" id="vehicle_registration" name="vehicle_registration" value="<?php echo escape($profile["vehicle_registration"]); ?>" placeholder="e.g. ABC 1234 / Honda Click 125i" required>
+                    </div>
+
+                    <div class="driver-doc-grid">
+                        <div class="driver-doc-card">
+                            <label>Valid ID Document</label>
+                            <?php if (!empty($profile["id_image"])): ?>
+                                <img class="driver-doc-thumb" src="uploads/ids/<?php echo escape($profile["id_image"]); ?>" alt="Driver ID Image">
+                                <small style="color:#64748B;">Current file: <?php echo escape($profile["id_image"]); ?></small>
+                            <?php else: ?>
+                                <div style="height:140px; background:#E2E8F0; border-radius:10px; display:flex; align-items:center; justify-content:center; color:#64748B; font-size:13px;">No ID uploaded</div>
+                            <?php endif; ?>
+                            <input type="file" id="id_image" name="id_image" accept="image/*">
+                        </div>
+
+                        <div class="driver-doc-card">
+                            <label>OR / CR Document</label>
+                            <?php if (!empty($profile["orcr_image"])): ?>
+                                <img class="driver-doc-thumb" src="uploads/orcr/<?php echo escape($profile["orcr_image"]); ?>" alt="Driver OR/CR Image">
+                                <small style="color:#64748B;">Current file: <?php echo escape($profile["orcr_image"]); ?></small>
+                            <?php else: ?>
+                                <div style="height:140px; background:#E2E8F0; border-radius:10px; display:flex; align-items:center; justify-content:center; color:#64748B; font-size:13px;">No OR/CR uploaded</div>
+                            <?php endif; ?>
+                            <input type="file" id="orcr_image" name="orcr_image" accept="image/*">
+                        </div>
+                    </div>
+
+                <?php elseif ($isStore): ?>
                     <div class="field">
                         <label for="store_name">Store name</label>
                         <input type="text" id="store_name" name="store_name" value="<?php echo escape($profile["store_name"]); ?>" required>
@@ -518,17 +848,18 @@ if ($pcat) {
                     <input type="hidden" id="map_lng" name="user_lng" value="<?php echo escape($profile["user_lng"]); ?>">
                 <?php endif; ?>
 
+                <?php if (!$isDriver): ?>
+                    <div id="profile-map"></div>
+                    <p class="store-pin-status" id="pin-status">
+                        <?php if ($mapLat !== "" && $mapLng !== ""): ?>
+                            Pinned at <?php echo escape($mapLat); ?>, <?php echo escape($mapLng); ?>.
+                        <?php else: ?>
+                            No location pinned yet. Tap on the map to set it.
+                        <?php endif; ?>
+                    </p>
+                <?php endif; ?>
 
-                <div id="profile-map"></div>
-                <p class="store-pin-status" id="pin-status">
-                    <?php if ($mapLat !== "" && $mapLng !== ""): ?>
-                        Pinned at <?php echo escape($mapLat); ?>, <?php echo escape($mapLng); ?>.
-                    <?php else: ?>
-                        No location pinned yet. Tap on the map to set it.
-                    <?php endif; ?>
-                </p>
-
-                <h2>Security</h2>
+                <h2>Account Security</h2>
                 <div class="field">
                     <label for="current_password">Current password</label>
                     <input type="password" id="current_password" name="current_password" required>
@@ -549,273 +880,284 @@ if ($pcat) {
         </section>
     </main>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script>
-        const map = L.map("profile-map", { zoomControl: true }).setView([14.5995, 120.9842], 12);
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-            attribution: "&copy; OpenStreetMap contributors"
-        }).addTo(map);
-
-        const latInput = document.getElementById("map_lat");
-        const lngInput = document.getElementById("map_lng");
-        const pinStatus = document.getElementById("pin-status");
-        const locationButton = document.getElementById("use-current-location");
-        const addressInput = document.getElementById(<?php echo $isStore ? '"store_address"' : '"user_address"'; ?>);
-        let marker = null;
-
-        function setPin(lat, lng, centerMap = false) {
-            if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-                return;
-            }
-            if (marker) {
-                marker.setLatLng([lat, lng]);
-            } else {
-                marker = L.circleMarker([lat, lng], {
-                    radius: 10,
-                    color: "#a80000",
-                    weight: 2,
-                    fillColor: "#f0c95d",
-                    fillOpacity: 0.95
-                }).addTo(map);
-            }
-            latInput.value = lat.toFixed(6);
-            lngInput.value = lng.toFixed(6);
-            pinStatus.textContent = `Pinned at ${latInput.value}, ${lngInput.value}.`;
-            if (centerMap) {
-                map.setView([lat, lng], 15);
+        function previewProfilePhoto(event) {
+            const input = event.target;
+            const file = input.files && input.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = document.getElementById("avatar-preview-img");
+                    const initial = document.getElementById("avatar-preview-initial");
+                    if (img) {
+                        img.src = e.target.result;
+                        img.style.display = "block";
+                    }
+                    if (initial) {
+                        initial.style.display = "none";
+                    }
+                };
+                reader.readAsDataURL(file);
             }
         }
-
-        async function suggestAddressFromPin(lat, lng) {
-            if (!addressInput) {
-                return;
-            }
-
-            try {
-                const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&zoom=18&addressdetails=0`, {
-                    cache: "force-cache"
-                });
-                if (!response.ok) {
-                    return;
-                }
-                const data = await response.json();
-                if (data && data.display_name) {
-                    addressInput.value = data.display_name;
-                }
-            } catch (error) {
-                // Keep the pinned coordinates even if address lookup is unavailable.
-            }
-        }
-
-        function pinCurrentLocation() {
-            if (!("geolocation" in navigator)) {
-                if (pinStatus) pinStatus.textContent = "Location access is not available in this browser.";
-                return;
-            }
-
-            const btnMap = document.getElementById("use-current-location");
-            const btnField = document.getElementById("use-current-location-field-btn");
-
-            const locatingHtml = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite;"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg> <span>Locating…</span>';
-            const iconHtml = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>';
-
-            if (btnMap) { btnMap.disabled = true; btnMap.innerHTML = locatingHtml; }
-            if (btnField) { btnField.disabled = true; btnField.innerHTML = locatingHtml; }
-            if (pinStatus) pinStatus.textContent = "Getting your current location...";
-
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    const lat = position.coords.latitude;
-                    const lng = position.coords.longitude;
-                    setPin(lat, lng, true);
-                    if (pinStatus) pinStatus.textContent = `Pinned from your current location at ${latInput.value}, ${lngInput.value}.`;
-                    suggestAddressFromPin(lat, lng);
-                    if (btnMap) { btnMap.disabled = false; btnMap.innerHTML = `${iconHtml} <span>Use my current location</span>`; }
-                    if (btnField) { btnField.disabled = false; btnField.innerHTML = `${iconHtml} <span>Use current location</span>`; }
-                },
-                () => {
-                    if (pinStatus) pinStatus.textContent = "Unable to access your current location. Allow location permission and try again.";
-                    if (btnMap) { btnMap.disabled = false; btnMap.innerHTML = `${iconHtml} <span>Use my current location</span>`; }
-                    if (btnField) { btnField.disabled = false; btnField.innerHTML = `${iconHtml} <span>Use current location</span>`; }
-                },
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-            );
-        }
-
-        const existingLat = Number(latInput.value);
-        const existingLng = Number(lngInput.value);
-        if (Number.isFinite(existingLat) && Number.isFinite(existingLng) && existingLat !== 0 && existingLng !== 0) {
-            setPin(existingLat, existingLng, true);
-        } else if ("geolocation" in navigator) {
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    map.setView([position.coords.latitude, position.coords.longitude], 14);
-                    if (pinStatus) pinStatus.textContent = "Current location found. Tap on map to pin exact delivery spot.";
-                },
-                () => map.setView([14.5995, 120.9842], 12),
-                { enableHighAccuracy: true, timeout: 10000 }
-            );
-        } else {
-            map.setView([14.5995, 120.9842], 12);
-        }
-
-        map.on("click", (event) => {
-            setPin(event.latlng.lat, event.latlng.lng, false);
-            suggestAddressFromPin(event.latlng.lat, event.latlng.lng);
-        });
-
-        const fieldLocationButton = document.getElementById("use-current-location-field-btn");
-        if (locationButton) {
-            locationButton.addEventListener("click", pinCurrentLocation);
-        }
-        if (fieldLocationButton) {
-            fieldLocationButton.addEventListener("click", pinCurrentLocation);
-        }
-
-        /* ── Address Autofill (Nominatim) for user delivery address ── */
-        (function () {
-            const addrInput   = document.getElementById("user_address");
-            const addrSugBox  = document.getElementById("user-addr-suggestions");
-            const addrSpinner = document.getElementById("user-addr-spinner");
-            const addrLatInp  = document.getElementById("map_lat");
-            const addrLngInp  = document.getElementById("map_lng");
-
-            if (!addrInput || !addrSugBox) return;
-
-            // Move dropdown to <body> to escape CSS Grid / container stacking context
-            document.body.appendChild(addrSugBox);
-
-            let debounceTimer  = null;
-            let activeIndex    = -1;
-            let currentResults = [];
-
-            function positionDropdown() {
-                const rect = addrInput.getBoundingClientRect();
-                addrSugBox.style.top   = (rect.bottom + 4) + "px";
-                addrSugBox.style.left  = rect.left + "px";
-                addrSugBox.style.width = rect.width + "px";
-            }
-
-            function showSpinner(show) {
-                addrSpinner && addrSpinner.classList.toggle("visible", show);
-            }
-
-            function closeSuggestions() {
-                addrSugBox.classList.remove("open");
-                addrSugBox.innerHTML = "";
-                activeIndex    = -1;
-                currentResults = [];
-            }
-
-            function openSuggestions(results) {
-                addrSugBox.innerHTML = "";
-                currentResults = results;
-                activeIndex    = -1;
-                if (!results.length) {
-                    const empty = document.createElement("div");
-                    empty.className = "address-suggestion-item";
-                    empty.innerHTML = `<span class="sug-icon">⚠</span><span class="sug-text"><strong>No results found</strong><span>Try a more specific address</span></span>`;
-                    addrSugBox.appendChild(empty);
-                } else {
-                    results.forEach((r, i) => {
-                        const parts     = r.display_name.split(", ");
-                        const primary   = parts.slice(0, 2).join(", ");
-                        const secondary = parts.slice(2).join(", ");
-                        const item      = document.createElement("div");
-                        item.className  = "address-suggestion-item";
-                        item.setAttribute("role", "option");
-                        item.setAttribute("data-index", i);
-                        item.innerHTML  = `<span class="sug-icon">📍</span><span class="sug-text"><strong>${primary}</strong><span>${secondary}</span></span>`;
-                        item.addEventListener("mousedown", (e) => {
-                            e.preventDefault();
-                            selectResult(i);
-                        });
-                        addrSugBox.appendChild(item);
-                    });
-                }
-                positionDropdown();
-                addrSugBox.classList.add("open");
-            }
-
-            function highlightItem(index) {
-                const items = addrSugBox.querySelectorAll(".address-suggestion-item");
-                items.forEach((el, i) => el.classList.toggle("active", i === index));
-            }
-
-            function selectResult(index) {
-                const r = currentResults[index];
-                if (!r) return;
-                addrInput.value = r.display_name;
-                const lat = parseFloat(r.lat);
-                const lng = parseFloat(r.lon);
-                if (addrLatInp) addrLatInp.value = lat.toFixed(6);
-                if (addrLngInp) addrLngInp.value = lng.toFixed(6);
-                // sync the map marker
-                if (typeof setPin === "function") {
-                    setPin(lat, lng, true);
-                }
-                closeSuggestions();
-                addrInput.focus();
-            }
-
-            async function fetchSuggestions(query) {
-                showSpinner(true);
-                try {
-                    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&limit=6&addressdetails=0`;
-                    const res = await fetch(url, { cache: "no-store" });
-                    if (!res.ok) throw new Error("Network error");
-                    const data = await res.json();
-                    openSuggestions(data);
-                } catch (err) {
-                    closeSuggestions();
-                } finally {
-                    showSpinner(false);
-                }
-            }
-
-            addrInput.addEventListener("input", () => {
-                clearTimeout(debounceTimer);
-                const val = addrInput.value.trim();
-                if (val.length < 3) {
-                    closeSuggestions();
-                    showSpinner(false);
-                    return;
-                }
-                showSpinner(true);
-                debounceTimer = setTimeout(() => fetchSuggestions(val), 400);
-            });
-
-            addrInput.addEventListener("keydown", (e) => {
-                const items = addrSugBox.querySelectorAll(".address-suggestion-item[data-index]");
-                if (!addrSugBox.classList.contains("open") || !items.length) return;
-                if (e.key === "ArrowDown") {
-                    e.preventDefault();
-                    activeIndex = (activeIndex + 1) % items.length;
-                    highlightItem(activeIndex);
-                } else if (e.key === "ArrowUp") {
-                    e.preventDefault();
-                    activeIndex = (activeIndex - 1 + items.length) % items.length;
-                    highlightItem(activeIndex);
-                } else if (e.key === "Enter" && activeIndex >= 0) {
-                    e.preventDefault();
-                    selectResult(activeIndex);
-                } else if (e.key === "Escape") {
-                    closeSuggestions();
-                }
-            });
-
-            addrInput.addEventListener("blur", () => {
-                setTimeout(closeSuggestions, 180);
-            });
-
-            // Keep dropdown aligned on scroll or resize
-            window.addEventListener("scroll", () => {
-                if (addrSugBox.classList.contains("open")) positionDropdown();
-            }, true);
-            window.addEventListener("resize", () => {
-                if (addrSugBox.classList.contains("open")) positionDropdown();
-            });
-        })();
     </script>
+
+    <?php if (!$isDriver): ?>
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""></script>
+        <script>
+            const map = L.map("profile-map", { zoomControl: true }).setView([14.5995, 120.9842], 12);
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                attribution: "&copy; OpenStreetMap contributors"
+            }).addTo(map);
+
+            const latInput = document.getElementById("map_lat");
+            const lngInput = document.getElementById("map_lng");
+            const pinStatus = document.getElementById("pin-status");
+            const addressInput = document.getElementById(<?php echo $isStore ? '"store_address"' : '"user_address"'; ?>);
+            let marker = null;
+
+            function setPin(lat, lng, centerMap = false) {
+                if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+                    return;
+                }
+                if (marker) {
+                    marker.setLatLng([lat, lng]);
+                } else {
+                    marker = L.circleMarker([lat, lng], {
+                        radius: 10,
+                        color: "#a80000",
+                        weight: 2,
+                        fillColor: "#f0c95d",
+                        fillOpacity: 0.95
+                    }).addTo(map);
+                }
+                latInput.value = lat.toFixed(6);
+                lngInput.value = lng.toFixed(6);
+                pinStatus.textContent = `Pinned at ${latInput.value}, ${lngInput.value}.`;
+                if (centerMap) {
+                    map.setView([lat, lng], 15);
+                }
+            }
+
+            async function suggestAddressFromPin(lat, lng) {
+                if (!addressInput) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&zoom=18&addressdetails=0`, {
+                        cache: "force-cache"
+                    });
+                    if (!response.ok) {
+                        return;
+                    }
+                    const data = await response.json();
+                    if (data && data.display_name) {
+                        addressInput.value = data.display_name;
+                    }
+                } catch (error) {
+                    // Keep pinned coordinates
+                }
+            }
+
+            function pinCurrentLocation() {
+                if (!("geolocation" in navigator)) {
+                    if (pinStatus) pinStatus.textContent = "Location access is not available in this browser.";
+                    return;
+                }
+
+                const btnField = document.getElementById("use-current-location-field-btn");
+                const iconHtml = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>';
+
+                if (btnField) { btnField.disabled = true; btnField.innerHTML = `<span>Locating…</span>`; }
+                if (pinStatus) pinStatus.textContent = "Getting your current location...";
+
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
+                        setPin(lat, lng, true);
+                        if (pinStatus) pinStatus.textContent = `Pinned from your current location at ${latInput.value}, ${lngInput.value}.`;
+                        suggestAddressFromPin(lat, lng);
+                        if (btnField) { btnField.disabled = false; btnField.innerHTML = `${iconHtml} <span>Use current location</span>`; }
+                    },
+                    () => {
+                        if (pinStatus) pinStatus.textContent = "Unable to access your current location. Allow location permission and try again.";
+                        if (btnField) { btnField.disabled = false; btnField.innerHTML = `${iconHtml} <span>Use current location</span>`; }
+                    },
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                );
+            }
+
+            const existingLat = Number(latInput ? latInput.value : 0);
+            const existingLng = Number(lngInput ? lngInput.value : 0);
+            if (Number.isFinite(existingLat) && Number.isFinite(existingLng) && existingLat !== 0 && existingLng !== 0) {
+                setPin(existingLat, existingLng, true);
+            } else if ("geolocation" in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        map.setView([position.coords.latitude, position.coords.longitude], 14);
+                        if (pinStatus) pinStatus.textContent = "Current location found. Tap on map to pin exact delivery spot.";
+                    },
+                    () => map.setView([14.5995, 120.9842], 12),
+                    { enableHighAccuracy: true, timeout: 10000 }
+                );
+            } else {
+                map.setView([14.5995, 120.9842], 12);
+            }
+
+            map.on("click", (event) => {
+                setPin(event.latlng.lat, event.latlng.lng, false);
+                suggestAddressFromPin(event.latlng.lat, event.latlng.lng);
+            });
+
+            const fieldLocationButton = document.getElementById("use-current-location-field-btn");
+            if (fieldLocationButton) {
+                fieldLocationButton.addEventListener("click", pinCurrentLocation);
+            }
+
+            /* Address Autofill for user address */
+            (function () {
+                const addrInput   = document.getElementById("user_address");
+                const addrSugBox  = document.getElementById("user-addr-suggestions");
+                const addrSpinner = document.getElementById("user-addr-spinner");
+                const addrLatInp  = document.getElementById("map_lat");
+                const addrLngInp  = document.getElementById("map_lng");
+
+                if (!addrInput || !addrSugBox) return;
+
+                document.body.appendChild(addrSugBox);
+
+                let debounceTimer  = null;
+                let activeIndex    = -1;
+                let currentResults = [];
+
+                function positionDropdown() {
+                    const rect = addrInput.getBoundingClientRect();
+                    addrSugBox.style.top   = (rect.bottom + 4) + "px";
+                    addrSugBox.style.left  = rect.left + "px";
+                    addrSugBox.style.width = rect.width + "px";
+                }
+
+                function showSpinner(show) {
+                    addrSpinner && addrSpinner.classList.toggle("visible", show);
+                }
+
+                function closeSuggestions() {
+                    addrSugBox.classList.remove("open");
+                    addrSugBox.innerHTML = "";
+                    activeIndex    = -1;
+                    currentResults = [];
+                }
+
+                function openSuggestions(results) {
+                    addrSugBox.innerHTML = "";
+                    currentResults = results;
+                    activeIndex    = -1;
+                    if (!results.length) {
+                        const empty = document.createElement("div");
+                        empty.className = "address-suggestion-item";
+                        empty.innerHTML = `<span class="sug-icon">⚠</span><span class="sug-text"><strong>No results found</strong><span>Try a more specific address</span></span>`;
+                        addrSugBox.appendChild(empty);
+                    } else {
+                        results.forEach((r, i) => {
+                            const parts     = r.display_name.split(", ");
+                            const primary   = parts.slice(0, 2).join(", ");
+                            const secondary = parts.slice(2).join(", ");
+                            const item      = document.createElement("div");
+                            item.className  = "address-suggestion-item";
+                            item.setAttribute("role", "option");
+                            item.setAttribute("data-index", i);
+                            item.innerHTML  = `<span class="sug-icon">📍</span><span class="sug-text"><strong>${primary}</strong><span>${secondary}</span></span>`;
+                            item.addEventListener("mousedown", (e) => {
+                                e.preventDefault();
+                                selectResult(i);
+                            });
+                            addrSugBox.appendChild(item);
+                        });
+                    }
+                    positionDropdown();
+                    addrSugBox.classList.add("open");
+                }
+
+                function highlightItem(index) {
+                    const items = addrSugBox.querySelectorAll(".address-suggestion-item");
+                    items.forEach((el, i) => el.classList.toggle("active", i === index));
+                }
+
+                function selectResult(index) {
+                    const r = currentResults[index];
+                    if (!r) return;
+                    addrInput.value = r.display_name;
+                    const lat = parseFloat(r.lat);
+                    const lng = parseFloat(r.lon);
+                    if (addrLatInp) addrLatInp.value = lat.toFixed(6);
+                    if (addrLngInp) addrLngInp.value = lng.toFixed(6);
+                    if (typeof setPin === "function") {
+                        setPin(lat, lng, true);
+                    }
+                    closeSuggestions();
+                    addrInput.focus();
+                }
+
+                async function fetchSuggestions(query) {
+                    showSpinner(true);
+                    try {
+                        const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&limit=6&addressdetails=0`;
+                        const res = await fetch(url, { cache: "no-store" });
+                        if (!res.ok) throw new Error("Network error");
+                        const data = await res.json();
+                        openSuggestions(data);
+                    } catch (err) {
+                        closeSuggestions();
+                    } finally {
+                        showSpinner(false);
+                    }
+                }
+
+                addrInput.addEventListener("input", () => {
+                    clearTimeout(debounceTimer);
+                    const val = addrInput.value.trim();
+                    if (val.length < 3) {
+                        closeSuggestions();
+                        showSpinner(false);
+                        return;
+                    }
+                    showSpinner(true);
+                    debounceTimer = setTimeout(() => fetchSuggestions(val), 400);
+                });
+
+                addrInput.addEventListener("keydown", (e) => {
+                    const items = addrSugBox.querySelectorAll(".address-suggestion-item[data-index]");
+                    if (!addrSugBox.classList.contains("open") || !items.length) return;
+                    if (e.key === "ArrowDown") {
+                        e.preventDefault();
+                        activeIndex = (activeIndex + 1) % items.length;
+                        highlightItem(activeIndex);
+                    } else if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        activeIndex = (activeIndex - 1 + items.length) % items.length;
+                        highlightItem(activeIndex);
+                    } else if (e.key === "Enter" && activeIndex >= 0) {
+                        e.preventDefault();
+                        selectResult(activeIndex);
+                    } else if (e.key === "Escape") {
+                        closeSuggestions();
+                    }
+                });
+
+                addrInput.addEventListener("blur", () => {
+                    setTimeout(closeSuggestions, 180);
+                });
+
+                window.addEventListener("scroll", () => {
+                    if (addrSugBox.classList.contains("open")) positionDropdown();
+                }, true);
+                window.addEventListener("resize", () => {
+                    if (addrSugBox.classList.contains("open")) positionDropdown();
+                });
+            })();
+        </script>
+    <?php endif; ?>
 </body>
 </html>

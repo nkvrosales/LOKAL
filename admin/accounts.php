@@ -176,7 +176,14 @@ $showAddModal = !empty($errors);
                         <?php foreach ($accounts as $account): ?>
                             <?php $location = $account["account_type"] === "store" ? $account["store_address"] : $account["user_address"]; ?>
                                     <tr>
-                                            <td><?php echo escape(admin_account_name($account)); ?></td>
+                                            <td>
+                                                <div style="display:flex; align-items:center; gap:8px;">
+                                                    <?php if (!empty($account["profile_image"]) && file_exists(__DIR__ . "/../uploads/profiles/" . $account["profile_image"])): ?>
+                                                        <img src="../uploads/profiles/<?php echo escape($account["profile_image"]); ?>" alt="Avatar" style="width:28px; height:28px; border-radius:50%; object-fit:cover; border:1px solid #CBD5E1;">
+                                                    <?php endif; ?>
+                                                    <span><?php echo escape(admin_account_name($account)); ?></span>
+                                                </div>
+                                            </td>
                                             <td><span class="admin-type-pill <?php echo escape($account["account_type"]); ?>"><?php echo escape(ucfirst($account["account_type"])); ?></span></td>
                                             <td><?php echo escape($account["email"]); ?></td>
                                             <td><?php echo escape($account["contact"]); ?></td>
@@ -190,17 +197,18 @@ $showAddModal = !empty($errors);
                                                     <?php endif; ?>
                                                 </td>
                                                 <td>
+                                                    <?php if ($account["profile_image"] !== ""): ?>
+                                                        <a class="text-link" href="../uploads/profiles/<?php echo urlencode($account["profile_image"]); ?>" target="_blank" rel="noopener">Photo</a>
+                                                    <?php endif; ?>
                                                     <?php if ($account["id_image"] !== ""): ?>
-                                                        <a class="text-link" href="../uploads/ids/<?php echo urlencode($account["id_image"]);
-                                                        ?>" target="_blank" rel="noopener">View ID</a>
+                                                        <a class="text-link" style="margin-left:6px;" href="../uploads/ids/<?php echo urlencode($account["id_image"]); ?>" target="_blank" rel="noopener">ID</a>
                                                     <?php endif; ?>
                                                     <?php if ($account["orcr_image"] !== ""): ?>
-                                                        <a class="text-link" style="margin-left:8px;" href="../uploads/orcr/<?php echo urlencode($account["orcr_image"]);
-                                                        ?>" target="_blank" rel="noopener">View OR/CR</a>
+                                                        <a class="text-link" style="margin-left:6px;" href="../uploads/orcr/<?php echo urlencode($account["orcr_image"]); ?>" target="_blank" rel="noopener">OR/CR</a>
                                                     <?php endif; ?>
                                                     <form method="post" style="display:inline;margin-left:8px;">
                                                         <input type="hidden" name="driver_id" value="<?php echo (int) $account['id']; ?>">
-                                                        <?php if (!$account["is_approved"]): ?>
+                                                         <?php if (!$account["is_approved"]): ?>
                                                             <button type="submit" name="driver_action" value="approve" class="acct-btn-save">Approve</button>
                                                         <?php else: ?>
                                                             <button type="submit" name="driver_action" value="revoke" class="acct-btn-cancel">Revoke</button>

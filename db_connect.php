@@ -99,6 +99,7 @@ function ensure_users_schema(mysqli $mysqli): void
         "id_image" => "ALTER TABLE users ADD COLUMN id_image VARCHAR(255) DEFAULT NULL AFTER vehicle_registration",
         "orcr_image" => "ALTER TABLE users ADD COLUMN orcr_image VARCHAR(255) DEFAULT NULL AFTER id_image",
         "is_approved" => "ALTER TABLE users ADD COLUMN is_approved TINYINT(1) NOT NULL DEFAULT 0 AFTER orcr_image",
+        "profile_image" => "ALTER TABLE users ADD COLUMN profile_image VARCHAR(255) DEFAULT NULL AFTER is_approved",
     ];
 
     foreach ($columnStatements as $column => $statement) {

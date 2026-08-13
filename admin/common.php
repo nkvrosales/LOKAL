@@ -68,7 +68,7 @@ function admin_fetch_accounts(mysqli $mysqli): array
     $result = $mysqli->query(
     "SELECT id, account_type, store_name, store_address, store_lat, store_lng,
         user_address, user_lat, user_lng, first_name, middle_name, last_name,
-        contact, email, created_at, is_approved, id_image, vehicle_registration, orcr_image
+        contact, email, created_at, is_approved, id_image, vehicle_registration, orcr_image, profile_image
      FROM users
      ORDER BY FIELD(account_type, 'admin', 'store', 'driver', 'user'), created_at DESC, id DESC"
     );
@@ -97,6 +97,7 @@ function admin_fetch_accounts(mysqli $mysqli): array
             "id_image" => (string) ($row["id_image"] ?? ""),
             "vehicle_registration" => (string) ($row["vehicle_registration"] ?? ""),
             "orcr_image" => (string) ($row["orcr_image"] ?? ""),
+            "profile_image" => (string) ($row["profile_image"] ?? ""),
             "created_at" => (string) ($row["created_at"] ?? ""),
         ];
     }

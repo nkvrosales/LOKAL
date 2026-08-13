@@ -87,9 +87,27 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $errors[] = "Store location coordinates are invalid.";
         }
     }
+    $profile_image_file = null;
+    if (isset($_FILES["driver_profile_image"]) && is_uploaded_file($_FILES["driver_profile_image"]["tmp_name"])) {
+        $profile_image_file = $_FILES["driver_profile_image"];
+    } elseif (isset($_FILES["profile_image"]) && is_uploaded_file($_FILES["profile_image"]["tmp_name"])) {
+        $profile_image_file = $_FILES["profile_image"];
+    }
+
     if ($values["account_type"] === "driver") {
         if ($values["vehicle_registration"] === "") {
             $errors[] = "Vehicle registration is required for drivers.";
+        }
+        // Profile photo is REQUIRED for driver accounts
+        if (!$profile_image_file) {
+            $errors[] = "Profile photo is required for driver registration.";
+        } else {
+            $allowed_ext = ["jpg", "jpeg", "png", "webp"];
+            $orig_p = $profile_image_file["name"];
+            $ext_p = strtolower(pathinfo($orig_p, PATHINFO_EXTENSION));
+            if (!in_array($ext_p, $allowed_ext, true)) {
+                $errors[] = "Profile photo must be JPG, PNG, or WEBP.";
+            }
         }
         // ID image is required for driver accounts
         if (!isset($_FILES["id_image"]) || !is_uploaded_file($_FILES["id_image"]["tmp_name"])) {
@@ -110,6 +128,16 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $ext2 = strtolower(pathinfo($orig2, PATHINFO_EXTENSION));
             if (!in_array($ext2, $allowed_ext, true)) {
                 $errors[] = "OR/CR image must be JPG, PNG, or WEBP.";
+            }
+        }
+    } else {
+        // Optional profile photo for user/store accounts
+        if ($profile_image_file) {
+            $allowed_ext = ["jpg", "jpeg", "png", "webp"];
+            $orig_p = $profile_image_file["name"];
+            $ext_p = strtolower(pathinfo($orig_p, PATHINFO_EXTENSION));
+            if (!in_array($ext_p, $allowed_ext, true)) {
+                $errors[] = "Profile photo must be JPG, PNG, or WEBP.";
             }
         }
     }
@@ -138,8 +166,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     if (!$errors) {
         $hash = password_hash($password, PASSWORD_DEFAULT);
         $stmt = $mysqli->prepare(
-            "INSERT INTO users (account_type, store_name, first_name, middle_name, last_name, contact, email, password_hash, user_address, user_lat, user_lng, store_address, store_lat, store_lng, store_category, vehicle_registration, orcr_image, id_image)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO users (account_type, store_name, first_name, middle_name, last_name, contact, email, password_hash, user_address, user_lat, user_lng, store_address, store_lat, store_lng, store_category, vehicle_registration, orcr_image, id_image, profile_image)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         );
         if ($stmt) {
             $store_name      = $values["account_type"] === "store" ? $values["store_name"] : null;
@@ -153,8 +181,25 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 ? $values["store_category"] : null;
             $id_image_filename = null;
             $orcr_image_filename = null;
+            $profile_image_filename = null;
+
+            $allowed_ext = ["jpg", "jpeg", "png", "webp"];
+
+            if ($profile_image_file) {
+                $orig_p = $profile_image_file["name"];
+                $ext_p = strtolower(pathinfo($orig_p, PATHINFO_EXTENSION));
+                if (in_array($ext_p, $allowed_ext, true)) {
+                    $uploads_dir_p = __DIR__ . DIRECTORY_SEPARATOR . "uploads" . DIRECTORY_SEPARATOR . "profiles";
+                    if (!is_dir($uploads_dir_p)) {
+                        mkdir($uploads_dir_p, 0777, true);
+                    }
+                    $profile_image_filename = bin2hex(random_bytes(8)) . "_" . time() . "." . $ext_p;
+                    $dest_p = $uploads_dir_p . DIRECTORY_SEPARATOR . $profile_image_filename;
+                    move_uploaded_file($profile_image_file["tmp_name"], $dest_p);
+                }
+            }
+
             if ($values["account_type"] === "driver") {
-                $allowed_ext = ["jpg", "jpeg", "png", "webp"];
                 if (isset($_FILES["id_image"]) && is_uploaded_file($_FILES["id_image"]["tmp_name"])) {
                     $orig = $_FILES["id_image"]["name"];
                     $ext = strtolower(pathinfo($orig, PATHINFO_EXTENSION));
@@ -186,7 +231,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $vehicle_registration = $values["account_type"] === "driver" ? $values["vehicle_registration"] : null;
 
             $stmt->bind_param(
-                str_repeat("s", 18),
+                str_repeat("s", 19),
                 $values["account_type"],
                 $store_name,
                 $values["first_name"],
@@ -204,7 +249,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 $store_category,
                 $vehicle_registration,
                 $orcr_image_filename,
-                $id_image_filename
+                $id_image_filename,
+                $profile_image_filename
             );
             if ($stmt->execute()) {
                 header("Location: login.php?registered=1");
@@ -884,22 +930,28 @@ if ($cat_res) {
                             </div>
                         </div>
 
-                        <!-- USER SPECIFIC: Delivery Address -->
-                        <div class="reg-field user-only" data-user-only>
-                            <label for="user_address">
-                                <span>Delivery Address</span>
-                                <button type="button" class="inline-loc-btn" id="use-current-location-field-btn">
-                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
-                                    <span>GPS</span>
-                                </button>
-                            </label>
-                            <div class="address-autofill-wrap">
-                                <input type="text" id="user_address" name="user_address" value="<?php echo escape($values["user_address"]); ?>" placeholder="Type your street, barangay or city..." autocomplete="off">
-                                <div class="address-autofill-spinner" id="user-addr-spinner"></div>
-                                <div class="address-suggestions" id="user-addr-suggestions" role="listbox" aria-label="Address suggestions"></div>
+                        <!-- USER SPECIFIC: Delivery Address & Profile Photo -->
+                        <div class="user-only" data-user-only>
+                            <div class="reg-field">
+                                <label for="user_address">
+                                    <span>Delivery Address</span>
+                                    <button type="button" class="inline-loc-btn" id="use-current-location-field-btn">
+                                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+                                        <span>GPS</span>
+                                    </button>
+                                </label>
+                                <div class="address-autofill-wrap">
+                                    <input type="text" id="user_address" name="user_address" value="<?php echo escape($values["user_address"]); ?>" placeholder="Type your street, barangay or city..." autocomplete="off">
+                                    <div class="address-autofill-spinner" id="user-addr-spinner"></div>
+                                    <div class="address-suggestions" id="user-addr-suggestions" role="listbox" aria-label="Address suggestions"></div>
+                                </div>
+                                <input type="hidden" id="user_lat" name="user_lat" value="<?php echo escape($values["user_lat"]); ?>">
+                                <input type="hidden" id="user_lng" name="user_lng" value="<?php echo escape($values["user_lng"]); ?>">
                             </div>
-                            <input type="hidden" id="user_lat" name="user_lat" value="<?php echo escape($values["user_lat"]); ?>">
-                            <input type="hidden" id="user_lng" name="user_lng" value="<?php echo escape($values["user_lng"]); ?>">
+                            <div class="reg-field" style="margin-top: 8px;">
+                                <label for="user_profile_image">Profile Photo <span style="font-weight:normal; font-size:11.5px; color:#64748B;">(Optional)</span></label>
+                                <input type="file" id="user_profile_image" name="profile_image" accept="image/*">
+                            </div>
                         </div>
 
                         <!-- STORE SPECIFIC: Store Info -->
@@ -931,17 +983,23 @@ if ($cat_res) {
 
                         <!-- DRIVER SPECIFIC: Vehicle & Documents -->
                         <div class="driver-only" data-driver-only hidden>
-                            <div class="reg-grid-row reg-grid-3">
+                            <div class="reg-grid-row reg-grid-2" style="margin-bottom: 8px;">
                                 <div class="reg-field">
-                                    <label for="vehicle_registration">Vehicle Type</label>
-                                    <input type="text" id="vehicle_registration" name="vehicle_registration" value="<?php echo escape($values['vehicle_registration']); ?>" placeholder="e.g. Motorcycle">
+                                    <label for="vehicle_registration">Vehicle Type / Plate</label>
+                                    <input type="text" id="vehicle_registration" name="vehicle_registration" value="<?php echo escape($values['vehicle_registration']); ?>" placeholder="e.g. Motorcycle (ABC-1234)">
                                 </div>
                                 <div class="reg-field">
-                                    <label for="id_image">Valid ID</label>
+                                    <label for="driver_profile_image">Driver Profile Photo <span style="font-weight:700; font-size:11.5px; color:#EF4444;">*Required</span></label>
+                                    <input type="file" id="driver_profile_image" name="driver_profile_image" accept="image/*">
+                                </div>
+                            </div>
+                            <div class="reg-grid-row reg-grid-2">
+                                <div class="reg-field">
+                                    <label for="id_image">Valid ID Document <span style="font-weight:700; font-size:11.5px; color:#EF4444;">*Required</span></label>
                                     <input type="file" id="id_image" name="id_image" accept="image/*">
                                 </div>
                                 <div class="reg-field">
-                                    <label for="orcr_image">OR / CR Doc</label>
+                                    <label for="orcr_image">OR / CR Document <span style="font-weight:700; font-size:11.5px; color:#EF4444;">*Required</span></label>
                                     <input type="file" id="orcr_image" name="orcr_image" accept="image/*">
                                 </div>
                             </div>
