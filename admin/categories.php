@@ -326,12 +326,6 @@ $showAddModal = !empty($errors) && ($_POST["action"] ?? "") === "add";
                                                     <?php echo $cat['is_active'] ? 'Deactivate' : 'Activate'; ?>
                                                 </button>
                                             </form>
-                                            <form method="post" style="display:inline"
-                                                onsubmit="return confirm('Delete category \"<?php echo escape(addslashes($cat['name'])); ?>\"? This cannot be undone.');">
-                                                <input type="hidden" name="action" value="delete">
-                                                <input type="hidden" name="id" value="<?php echo (int) $cat['id']; ?>">
-                                                <button type="submit" class="cat-btn-delete">Delete</button>
-                                            </form>
                                         </div>
                                     </td>
                                 </tr>

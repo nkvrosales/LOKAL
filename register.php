@@ -137,10 +137,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     if (!$errors) {
         $hash = password_hash($password, PASSWORD_DEFAULT);
-          $stmt = $mysqli->prepare(
-              "INSERT INTO users (account_type, store_name, first_name, middle_name, last_name, contact, email, password_hash, user_address, user_lat, user_lng, store_address, store_lat, store_lng, store_category, vehicle_registration, orcr_image, id_image)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-          );
+        $stmt = $mysqli->prepare(
+            "INSERT INTO users (account_type, store_name, first_name, middle_name, last_name, contact, email, password_hash, user_address, user_lat, user_lng, store_address, store_lat, store_lng, store_category, vehicle_registration, orcr_image, id_image)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        );
         if ($stmt) {
             $store_name      = $values["account_type"] === "store" ? $values["store_name"] : null;
             $user_address    = $values["account_type"] === "user"  ? $values["user_address"]   : null;
@@ -151,7 +151,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $store_lng       = $values["account_type"] === "store" ? $values["store_lng"]       : null;
             $store_category  = $values["account_type"] === "store" && $values["store_category"] !== ""
                 ? $values["store_category"] : null;
-            // Handle driver ID and OR/CR uploads if provided
             $id_image_filename = null;
             $orcr_image_filename = null;
             if ($values["account_type"] === "driver") {
@@ -234,52 +233,533 @@ if ($cat_res) {
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register | Lokal</title>
-    <link rel="stylesheet" href="assets/styles.css?v=primary-bw-icons-1">
+    <link rel="stylesheet" href="assets/styles.css?v=no-scroll-reg-1">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
     <style>
+        /* ── Fullscreen Zero-Scroll Wrapper ── */
+        html, body {
+            height: 100vh;
+            max-height: 100vh;
+            overflow: hidden !important;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        .reg-shell {
+            height: 100vh;
+            max-height: 100vh;
+            width: 100vw;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 12px 20px;
+            box-sizing: border-box;
+            overflow: hidden;
+            position: relative;
+            z-index: 1;
+        }
+
+        .reg-container {
+            display: grid;
+            grid-template-columns: 1.18fr 0.82fr;
+            gap: 16px;
+            width: 100%;
+            max-width: 1140px;
+            height: min(95vh, 730px);
+            align-items: stretch;
+        }
+
+        /* ── Left Side: Form Panel ── */
+        .reg-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border-radius: 20px;
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            box-shadow: 0 16px 40px -8px rgba(15, 23, 42, 0.12);
+            padding: 20px 24px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+
+        .reg-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #F1F5F9;
+        }
+
+        .reg-header-titles h1 {
+            font-size: 21px;
+            margin: 0 0 2px;
+            color: #0F172A;
+            line-height: 1.2;
+            font-weight: 800;
+        }
+
+        .reg-header-titles p {
+            margin: 0;
+            font-size: 12.5px;
+            color: #64748B;
+            font-weight: 500;
+        }
+
+        .reg-signin-btn {
+            font-size: 12.5px;
+            font-weight: 600;
+            color: var(--primary, #FF4D2E);
+            background: rgba(255, 77, 46, 0.08);
+            padding: 5px 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 77, 46, 0.2);
+            transition: all 0.2s;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        .reg-signin-btn:hover {
+            background: rgba(255, 77, 46, 0.16);
+            border-color: #FF4D2E;
+        }
+
+        /* ── Role Selector Tabs (Segmented Control) ── */
+        .reg-role-nav {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 6px;
+            background: #F1F5F9;
+            padding: 4px;
+            border-radius: 12px;
+            margin-bottom: 10px;
+        }
+
+        .reg-role-tab {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 7px 10px;
+            border-radius: 9px;
+            font-size: 12.5px;
+            font-weight: 700;
+            color: #64748B;
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            user-select: none;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .reg-role-tab input {
+            display: none;
+        }
+
+        .reg-role-tab:has(input:checked) {
+            background: #FFFFFF;
+            color: var(--primary, #FF4D2E);
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+        }
+
+        .reg-role-tab svg {
+            width: 14px;
+            height: 14px;
+            flex-shrink: 0;
+        }
+
+        /* ── Compact Form Grid ── */
+        .reg-form-body {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex: 1;
+            justify-content: center;
+        }
+
+        .reg-grid-row {
+            display: grid;
+            gap: 10px;
+        }
+
+        .reg-grid-3 {
+            grid-template-columns: 1fr 1fr 1fr;
+        }
+
+        .reg-grid-2 {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .reg-field {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .reg-field label {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: #475569;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .reg-field input, 
+        .reg-field select {
+            width: 100%;
+            height: 36px;
+            padding: 6px 11px;
+            border-radius: 8px;
+            border: 1.5px solid #E2E8F0;
+            background: #FFFFFF;
+            color: #0F172A;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 500;
+            outline: none;
+            box-sizing: border-box;
+            transition: all 0.15s ease;
+        }
+
+        .reg-field input:focus, 
+        .reg-field select:focus {
+            border-color: #FF4D2E;
+            box-shadow: 0 0 0 3px rgba(255, 77, 46, 0.12);
+        }
+
+        .reg-field input[type="file"] {
+            padding: 4px 8px;
+            font-size: 11.5px;
+            height: 36px;
+            cursor: pointer;
+        }
+
+        /* Inline Current Location Button */
+        .inline-loc-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: rgba(255, 77, 46, 0.08);
+            border: 1px solid rgba(255, 77, 46, 0.25);
+            border-radius: 999px;
+            padding: 2px 8px;
+            font-size: 10.5px;
+            font-weight: 700;
+            color: #FF4D2E;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .inline-loc-btn:hover {
+            background: rgba(255, 77, 46, 0.18);
+            border-color: #FF4D2E;
+        }
+
+        .inline-loc-btn:disabled {
+            opacity: 0.6;
+            cursor: wait;
+        }
+
+        /* Password Toggle */
+        .reg-pw-wrap {
+            position: relative;
+        }
+        .reg-pw-wrap input {
+            padding-right: 32px;
+        }
+        .reg-pw-btn {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #94A3B8;
+            cursor: pointer;
+            padding: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .reg-pw-btn:hover {
+            color: #0F172A;
+        }
+
+        /* Error Notice */
+        .reg-errors {
+            background: #FEF2F2;
+            border: 1px solid #FCA5A5;
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-size: 11.5px;
+            color: #991B1B;
+            margin-bottom: 6px;
+            line-height: 1.35;
+        }
+
+        /* Submit Action Row */
+        .reg-footer {
+            margin-top: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .reg-submit-btn {
+            width: 100%;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #FF4D2E 0%, #E03E22 100%);
+            color: #FFFFFF;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0.2px;
+            cursor: pointer;
+            box-shadow: 0 4px 14px rgba(255, 77, 46, 0.35);
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .reg-submit-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(255, 77, 46, 0.45);
+            filter: brightness(1.04);
+        }
+
+        .reg-terms-text {
+            text-align: center;
+            font-size: 11px;
+            color: #94A3B8;
+            margin: 0;
+        }
+
+        /* ── Right Side: Map & Live Context Panel (White Theme) ── */
+        .reg-side-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border-radius: 20px;
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            box-shadow: 0 16px 40px -8px rgba(15, 23, 42, 0.12);
+            padding: 20px 24px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            color: #0F172A;
+            overflow: hidden;
+            position: relative;
+            box-sizing: border-box;
+        }
+
+        .reg-side-panel::before {
+            content: "";
+            position: absolute;
+            top: -40%;
+            right: -40%;
+            width: 80%;
+            height: 80%;
+            background: radial-gradient(circle, rgba(255, 77, 46, 0.06) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .reg-side-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .reg-side-header-text h2 {
+            font-size: 16px;
+            margin: 0 0 2px;
+            color: #0F172A;
+            font-weight: 800;
+            line-height: 1.2;
+        }
+
+        .reg-side-header-text p {
+            margin: 0;
+            font-size: 12px;
+            color: #64748B;
+            font-weight: 500;
+        }
+
+        .reg-map-container {
+            flex: 1;
+            min-height: 0;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            z-index: 2;
+        }
+
+        .reg-map-frame {
+            flex: 1;
+            min-height: 180px;
+            width: 100%;
+            border-radius: 14px;
+            border: 1.5px solid #E2E8F0;
+            overflow: hidden;
+            background: #F8FAFC;
+            box-shadow: inset 0 2px 4px rgba(15, 23, 42, 0.03);
+        }
+
+        .reg-map-footer {
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .reg-map-status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11.5px;
+            font-weight: 600;
+            color: #475569;
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 8px;
+            padding: 6px 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+        }
+
+        .reg-map-status-pill svg {
+            color: #FF4D2E;
+            flex-shrink: 0;
+        }
+
+        .reg-map-action-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11.5px;
+            font-weight: 700;
+            color: #FF4D2E;
+            background: rgba(255, 77, 46, 0.08);
+            border: 1.5px solid rgba(255, 77, 46, 0.25);
+            border-radius: 8px;
+            padding: 6px 14px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            white-space: nowrap;
+        }
+
+        .reg-map-action-btn:hover {
+            background: rgba(255, 77, 46, 0.16);
+            border-color: #FF4D2E;
+            transform: translateY(-1px);
+            box-shadow: 0 3px 10px rgba(255, 77, 46, 0.15);
+        }
+
+        .reg-map-action-btn:disabled {
+            opacity: 0.6;
+            cursor: wait;
+        }
+
+        /* ── Driver Onboarding Info View (White Theme) ── */
+        .reg-driver-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 10px;
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 14px;
+            padding: 16px;
+        }
+
+        .driver-perk-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            font-size: 12px;
+            color: #64748B;
+            line-height: 1.45;
+            background: #FFFFFF;
+            border: 1px solid #E2E8F0;
+            border-radius: 10px;
+            padding: 10px 12px;
+            box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03);
+        }
+
+        .driver-perk-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            background: rgba(255, 77, 46, 0.1);
+            color: #FF4D2E;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 13px;
+        }
+
+        /* ── Address Autofill Dropdown ── */
         .address-autofill-wrap {
             position: relative;
+            width: 100%;
         }
         .address-suggestions {
             position: fixed;
             background: #fff;
-            border: 1px solid rgba(255,91,46,.28);
+            border: 1px solid rgba(255, 91, 46, .28);
             border-radius: 10px;
-            box-shadow: 0 8px 28px rgba(0,0,0,.15);
+            box-shadow: 0 8px 28px rgba(0,0,0,.18);
             z-index: 999999;
             overflow-y: auto;
             display: none;
-            max-height: 240px;
+            max-height: 180px;
         }
         .address-suggestions.open {
             display: block;
         }
         .address-suggestion-item {
-            padding: 10px 14px;
-            font-size: 13px;
+            padding: 8px 12px;
+            font-size: 12px;
             color: #333;
             cursor: pointer;
             border-bottom: 1px solid rgba(0,0,0,.06);
             display: flex;
             align-items: flex-start;
-            gap: 8px;
-            transition: background .15s;
+            gap: 6px;
+            transition: background .12s;
         }
         .address-suggestion-item:last-child {
             border-bottom: none;
         }
         .address-suggestion-item:hover,
         .address-suggestion-item.active {
-            background: rgba(255,91,46,.08);
+            background: rgba(255, 91, 46, .08);
         }
         .address-suggestion-item .sug-icon {
             flex-shrink: 0;
             margin-top: 1px;
             color: #ff5b2e;
-            font-size: 14px;
-        }
-        .address-suggestion-item .sug-text {
-            line-height: 1.4;
+            font-size: 12px;
         }
         .address-suggestion-item .sug-text strong {
             display: block;
@@ -288,16 +768,16 @@ if ($cat_res) {
         }
         .address-suggestion-item .sug-text span {
             color: #777;
-            font-size: 12px;
+            font-size: 11px;
         }
         .address-autofill-spinner {
             position: absolute;
-            right: 12px;
+            right: 10px;
             top: 50%;
             transform: translateY(-50%);
-            width: 16px;
-            height: 16px;
-            border: 2px solid rgba(255,91,46,.2);
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255, 91, 46, .2);
             border-top-color: #ff5b2e;
             border-radius: 50%;
             animation: spin .7s linear infinite;
@@ -309,232 +789,314 @@ if ($cat_res) {
         }
         @keyframes spin { to { transform: translateY(-50%) rotate(360deg); } }
 
-        .profile-location-btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            border: 1.5px solid rgba(255, 77, 46, 0.3);
-            border-radius: 999px;
-            padding: 6px 14px;
-            background: linear-gradient(135deg, rgba(255, 77, 46, 0.12) 0%, rgba(255, 77, 46, 0.05) 100%);
-            color: #FF4D2E;
-            cursor: pointer;
-            font-family: inherit;
-            font-size: 12px;
-            font-weight: 700;
-            letter-spacing: 0.2px;
-            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-            box-shadow: 0 2px 6px rgba(255, 77, 46, 0.08);
-            user-select: none;
-        }
-        .profile-location-btn:hover,
-        .profile-location-btn:focus-visible {
-            background: linear-gradient(135deg, rgba(255, 77, 46, 0.22) 0%, rgba(255, 77, 46, 0.12) 100%);
-            border-color: #FF4D2E;
-            box-shadow: 0 4px 14px rgba(255, 77, 46, 0.2);
-            transform: translateY(-1px);
-        }
-        .profile-location-btn:active {
-            transform: translateY(0) scale(0.97);
-            box-shadow: 0 2px 4px rgba(255, 77, 46, 0.1);
-        }
-        .profile-location-btn:disabled {
-            cursor: wait;
-            opacity: 0.65;
-            box-shadow: none;
-            transform: none;
+        /* Responsive Fallback */
+        @media (max-width: 860px) {
+            html, body {
+                height: auto;
+                max-height: none;
+                overflow-y: auto !important;
+            }
+            .reg-shell {
+                height: auto;
+                max-height: none;
+                padding: 16px;
+            }
+            .reg-container {
+                grid-template-columns: 1fr;
+                height: auto;
+                max-height: none;
+            }
+            .reg-side-panel {
+                min-height: 320px;
+            }
         }
     </style>
 </head>
 <body>
-    <main class="auth-shell">
-        <div class="auth-grid">
-            <section class="brand-panel">
-                <div class="brand-top">
-                    <div class="badge"><span></span> Lokal Access</div>
-                    <div id="brand-copy">
-                        <h1>Create your account</h1>
-                        <p>Join the red and gold network. Your account unlocks the map dashboard and guided routes.</p>
+    <main class="reg-shell">
+        <div class="reg-container">
+            <!-- Left Side: Registration Form Card -->
+            <section class="reg-card">
+                <!-- Header -->
+                <div class="reg-header">
+                    <div class="reg-header-titles">
+                        <h1>Create Account</h1>
+                        <p>Join the Lokal merchant & delivery network</p>
                     </div>
-                    <div class="store-map-wrap" id="store-map-wrap" hidden>
-                        <h2>Store location</h2>
-                        <p class="status-text">Tap the map to drop a pin for your store.</p>
-                        <div id="store-map"></div>
-                        <div class="map-status" id="store-map-status">No location pinned yet.</div>
-                    </div>
-                    <div class="store-map-wrap" id="user-map-wrap">
-                        <h2>Delivery location</h2>
-                        <p class="status-text">Tap the map to drop a pin for your delivery address.</p>
-                        <div style="margin-bottom:10px;">
-                            <button class="profile-location-btn" id="use-current-location" type="button">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
-                                <span>Use my current location</span>
-                            </button>
-                        </div>
-                        <div id="user-map"></div>
-                        <div class="map-status" id="user-map-status">No location pinned yet.</div>
-                    </div>
+                    <a href="login.php" class="reg-signin-btn">Sign In</a>
                 </div>
-                <p>Already have an account? <a class="text-link" href="login.php">Sign in here</a>.</p>
-            </section>
-            <section class="card">
-                <h2>Registration</h2>
-                <p class="status-text">Complete all fields to continue.</p>
+
+                <!-- Error Messages if any -->
                 <?php if ($errors): ?>
-                    <div class="notice error">
+                    <div class="reg-errors">
                         <?php foreach ($errors as $error): ?>
-                            <div><?php echo escape($error); ?></div>
+                            <div>• <?php echo escape($error); ?></div>
                         <?php endforeach; ?>
                     </div>
                 <?php endif; ?>
-                <form method="post" class="form-stack" enctype="multipart/form-data">
-                    <div class="field">
-                        <label>Register as</label>
-                        <div class="choice-group" role="radiogroup" aria-label="Account type">
-                            <label class="choice-option">
-                                <input type="radio" name="account_type" value="user" <?php echo $values["account_type"] === "user" ? "checked" : ""; ?> required>
-                                <span>User</span>
+
+                <form method="post" id="registration-form" enctype="multipart/form-data" style="display:contents;">
+                    <!-- Segmented Account Selector -->
+                    <div class="reg-role-nav" role="radiogroup" aria-label="Account type">
+                        <label class="reg-role-tab" id="tab-user">
+                            <input type="radio" name="account_type" value="user" <?php echo $values["account_type"] === "user" ? "checked" : ""; ?> required>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            <span>Customer</span>
+                        </label>
+                        <label class="reg-role-tab" id="tab-store">
+                            <input type="radio" name="account_type" value="store" <?php echo $values["account_type"] === "store" ? "checked" : ""; ?> required>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                            <span>Store Owner</span>
+                        </label>
+                        <label class="reg-role-tab" id="tab-driver">
+                            <input type="radio" name="account_type" value="driver" <?php echo $values["account_type"] === "driver" ? "checked" : ""; ?> required>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/></svg>
+                            <span>Rider</span>
+                        </label>
+                    </div>
+
+                    <div class="reg-form-body">
+                        <!-- Row 1: Full Name (3 Cols) -->
+                        <div class="reg-grid-row reg-grid-3">
+                            <div class="reg-field">
+                                <label for="first_name">First Name</label>
+                                <input type="text" id="first_name" name="first_name" value="<?php echo escape($values["first_name"]); ?>" placeholder="Juan" required>
+                            </div>
+                            <div class="reg-field">
+                                <label for="middle_name">Middle Name</label>
+                                <input type="text" id="middle_name" name="middle_name" value="<?php echo escape($values["middle_name"]); ?>" placeholder="Santos" required>
+                            </div>
+                            <div class="reg-field">
+                                <label for="last_name">Last Name</label>
+                                <input type="text" id="last_name" name="last_name" value="<?php echo escape($values["last_name"]); ?>" placeholder="Dela Cruz" required>
+                            </div>
+                        </div>
+
+                        <!-- Row 2: Contact & Email (2 Cols) -->
+                        <div class="reg-grid-row reg-grid-2">
+                            <div class="reg-field">
+                                <label for="contact">Phone Number</label>
+                                <input type="tel" id="contact" name="contact" value="<?php echo escape($values["contact"]); ?>" placeholder="0912 345 6789" required>
+                            </div>
+                            <div class="reg-field">
+                                <label for="email">Email Address</label>
+                                <input type="email" id="email" name="email" value="<?php echo escape($values["email"]); ?>" placeholder="juan@example.com" required>
+                            </div>
+                        </div>
+
+                        <!-- USER SPECIFIC: Delivery Address -->
+                        <div class="reg-field user-only" data-user-only>
+                            <label for="user_address">
+                                <span>Delivery Address</span>
+                                <button type="button" class="inline-loc-btn" id="use-current-location-field-btn">
+                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+                                    <span>GPS</span>
+                                </button>
                             </label>
-                            <label class="choice-option">
-                                <input type="radio" name="account_type" value="store" <?php echo $values["account_type"] === "store" ? "checked" : ""; ?> required>
-                                <span>Store</span>
-                            </label>
-                            <label class="choice-option">
-                                <input type="radio" name="account_type" value="driver" <?php echo $values["account_type"] === "driver" ? "checked" : ""; ?> required>
-                                <span>Delivery Rider</span>
-                            </label>
+                            <div class="address-autofill-wrap">
+                                <input type="text" id="user_address" name="user_address" value="<?php echo escape($values["user_address"]); ?>" placeholder="Type your street, barangay or city..." autocomplete="off">
+                                <div class="address-autofill-spinner" id="user-addr-spinner"></div>
+                                <div class="address-suggestions" id="user-addr-suggestions" role="listbox" aria-label="Address suggestions"></div>
+                            </div>
+                            <input type="hidden" id="user_lat" name="user_lat" value="<?php echo escape($values["user_lat"]); ?>">
+                            <input type="hidden" id="user_lng" name="user_lng" value="<?php echo escape($values["user_lng"]); ?>">
+                        </div>
+
+                        <!-- STORE SPECIFIC: Store Info -->
+                        <div class="store-only" data-store-only hidden>
+                            <div class="reg-grid-row reg-grid-2" style="margin-bottom: 8px;">
+                                <div class="reg-field">
+                                    <label for="store_name">Store Name</label>
+                                    <input type="text" id="store_name" name="store_name" value="<?php echo escape($values["store_name"]); ?>" placeholder="e.g. Bella Bakery">
+                                </div>
+                                <div class="reg-field">
+                                    <label for="store_category">Category</label>
+                                    <select id="store_category" name="store_category">
+                                        <option value="">— Select category —</option>
+                                        <?php foreach ($reg_categories as $rc): ?>
+                                            <option value="<?php echo escape($rc['slug']); ?>" <?php echo $values['store_category'] === $rc['slug'] ? 'selected' : ''; ?>>
+                                                <?php echo escape($rc['name']); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="reg-field">
+                                <label for="store_address">Store Address</label>
+                                <input type="text" id="store_address" name="store_address" value="<?php echo escape($values["store_address"]); ?>" placeholder="Street, city, province">
+                                <input type="hidden" id="store_lat" name="store_lat" value="<?php echo escape($values["store_lat"]); ?>">
+                                <input type="hidden" id="store_lng" name="store_lng" value="<?php echo escape($values["store_lng"]); ?>">
+                            </div>
+                        </div>
+
+                        <!-- DRIVER SPECIFIC: Vehicle & Documents -->
+                        <div class="driver-only" data-driver-only hidden>
+                            <div class="reg-grid-row reg-grid-3">
+                                <div class="reg-field">
+                                    <label for="vehicle_registration">Vehicle Type</label>
+                                    <input type="text" id="vehicle_registration" name="vehicle_registration" value="<?php echo escape($values['vehicle_registration']); ?>" placeholder="e.g. Motorcycle">
+                                </div>
+                                <div class="reg-field">
+                                    <label for="id_image">Valid ID</label>
+                                    <input type="file" id="id_image" name="id_image" accept="image/*">
+                                </div>
+                                <div class="reg-field">
+                                    <label for="orcr_image">OR / CR Doc</label>
+                                    <input type="file" id="orcr_image" name="orcr_image" accept="image/*">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Row 3: Passwords (2 Cols) -->
+                        <div class="reg-grid-row reg-grid-2">
+                            <div class="reg-field">
+                                <label for="password">Password</label>
+                                <div class="reg-pw-wrap">
+                                    <input type="password" id="password" name="password" placeholder="Min. 6 characters" required>
+                                    <button type="button" class="reg-pw-btn" onclick="togglePasswordVisibility('password', this)" title="Toggle password">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="reg-field">
+                                <label for="confirm_password">Confirm Password</label>
+                                <div class="reg-pw-wrap">
+                                    <input type="password" id="confirm_password" name="confirm_password" placeholder="Repeat password" required>
+                                    <button type="button" class="reg-pw-btn" onclick="togglePasswordVisibility('confirm_password', this)" title="Toggle password">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="field store-only" data-store-only>
-                        <label for="store_name">Store name</label>
-                        <input type="text" id="store_name" name="store_name" value="<?php echo escape($values["store_name"]); ?>" placeholder="Your store name">
+
+                    <!-- Footer Action -->
+                    <div class="reg-footer">
+                        <button type="submit" class="reg-submit-btn">
+                            <span>Complete Registration</span>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                        </button>
+                        <p class="reg-terms-text">By registering, you agree to Lokal Terms of Service & Privacy Policy.</p>
                     </div>
-                    <div class="field store-only" data-store-only>
-                        <label for="store_address">Store address</label>
-                        <input type="text" id="store_address" name="store_address" value="<?php echo escape($values["store_address"]); ?>" placeholder="Street, city, province" autocomplete="street-address">
-                        <input type="hidden" id="store_lat" name="store_lat" value="<?php echo escape($values["store_lat"]); ?>">
-                        <input type="hidden" id="store_lng" name="store_lng" value="<?php echo escape($values["store_lng"]); ?>">
-                    </div>
-                    <div class="field store-only" data-store-only>
-                        <label for="store_category">Store category</label>
-                        <select id="store_category" name="store_category" style="height:44px;padding:0 12px;border:1px solid rgba(255,91,46,.22);border-radius:10px;font-size:13.5px;outline:none;width:100%;background:#fff;box-sizing:border-box;">
-                            <option value="">— Select a category —</option>
-                            <?php foreach ($reg_categories as $rc): ?>
-                                <option value="<?php echo escape($rc['slug']); ?>" <?php echo $values['store_category'] === $rc['slug'] ? 'selected' : ''; ?>>
-                                    <?php echo escape($rc['name']); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="field user-only" data-user-only>
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                            <label for="user_address" style="margin-bottom:0;">Delivery address</label>
-                            <button class="profile-location-btn" id="use-current-location-field-btn" type="button">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
-                                <span>Use current location</span>
-                            </button>
-                        </div>
-                        <div class="address-autofill-wrap">
-                            <input type="text" id="user_address" name="user_address" value="<?php echo escape($values["user_address"]); ?>" placeholder="Start typing your delivery address…" autocomplete="off">
-                            <div class="address-autofill-spinner" id="user-addr-spinner"></div>
-                            <div class="address-suggestions" id="user-addr-suggestions" role="listbox" aria-label="Address suggestions"></div>
-                        </div>
-                        <input type="hidden" id="user_lat" name="user_lat" value="<?php echo escape($values["user_lat"]); ?>">
-                        <input type="hidden" id="user_lng" name="user_lng" value="<?php echo escape($values["user_lng"]); ?>">
-                    </div>
-                    <div class="driver-only" data-driver-only hidden>
-                        <div class="field">
-                            <label for="vehicle_registration">Vehicle registration</label>
-                            <input type="text" id="vehicle_registration" name="vehicle_registration" value="<?php echo escape($values['vehicle_registration']); ?>" placeholder="e.g. Motor, Tricycle, Car">
-                        </div>
-                        <div class="field">
-                            <label for="id_image">Valid ID (upload)</label>
-                            <input type="file" id="id_image" name="id_image" accept="image/*">
-                        </div>
-                        <div class="field">
-                            <label for="orcr_image">OR/CR document (upload)</label>
-                            <input type="file" id="orcr_image" name="orcr_image" accept="image/*">
-                        </div>
-                    </div>
-                    <div class="split">
-                        <div class="field">
-                            <label for="first_name">First name</label>
-                            <input type="text" id="first_name" name="first_name" value="<?php echo escape($values["first_name"]); ?>" required>
-                        </div>
-                        <div class="field">
-                            <label for="middle_name">Middle name</label>
-                            <input type="text" id="middle_name" name="middle_name" value="<?php echo escape($values["middle_name"]); ?>" required>
-                        </div>
-                    </div>
-                    <div class="field">
-                        <label for="last_name">Last name</label>
-                        <input type="text" id="last_name" name="last_name" value="<?php echo escape($values["last_name"]); ?>" required>
-                    </div>
-                    <div class="field">
-                        <label for="contact">Contact</label>
-                        <input type="text" id="contact" name="contact" value="<?php echo escape($values["contact"]); ?>" required>
-                    </div>
-                    <div class="field">
-                        <label for="email">Email</label>
-                        <input type="email" id="email" name="email" value="<?php echo escape($values["email"]); ?>" required>
-                    </div>
-                    <div class="split">
-                        <div class="field">
-                            <label for="password">Password</label>
-                            <input type="password" id="password" name="password" required>
-                        </div>
-                        <div class="field">
-                            <label for="confirm_password">Confirm password</label>
-                            <input type="password" id="confirm_password" name="confirm_password" required>
-                        </div>
-                    </div>
-                    <button class="btn" type="submit">Create account</button>
-                    <p class="status-text">By continuing, you agree to keep your credentials secure.</p>
                 </form>
+            </section>
+
+            <!-- Right Side: Live Map & Context Panel -->
+            <section class="reg-side-panel">
+                <!-- User & Store Map Panel -->
+                <div class="reg-map-container" id="side-map-container">
+                    <div class="reg-side-header">
+                        <div class="reg-side-header-text">
+                            <h2 id="side-map-title">Pin Delivery Location</h2>
+                            <p id="side-map-desc">Tap anywhere on the map to set your exact location</p>
+                        </div>
+                    </div>
+
+                    <div class="reg-map-frame">
+                        <div id="user-map" style="width:100%; height:100%;"></div>
+                        <div id="store-map" style="width:100%; height:100%; display:none;"></div>
+                    </div>
+
+                    <div class="reg-map-footer">
+                        <div class="reg-map-status-pill" id="active-map-status">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                            <span id="map-status-text">No location pinned yet</span>
+                        </div>
+                        <button type="button" class="reg-map-action-btn" id="use-current-location">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+                            <span>Use My GPS</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Driver Information Panel (Shown when Driver is chosen) -->
+                <div class="reg-driver-info" id="driver-info-panel" style="display:none;">
+                    <div class="reg-side-header">
+                        <div class="reg-side-header-text">
+                            <h2>Rider Onboarding Hub</h2>
+                            <p>Fast approval & flexible local delivery earnings</p>
+                        </div>
+                    </div>
+
+                    <div class="driver-perk-item">
+                        <div class="driver-perk-icon">⚡</div>
+                        <div>
+                            <strong style="color:#0F172A; display:block; font-size:12.5px; margin-bottom:2px;">Instant Order Routing</strong>
+                            Receive delivery requests within your neighborhood automatically with real-time turn directions.
+                        </div>
+                    </div>
+
+                    <div class="driver-perk-item">
+                        <div class="driver-perk-icon">💰</div>
+                        <div>
+                            <strong style="color:#0F172A; display:block; font-size:12.5px; margin-bottom:2px;">Daily Payouts</strong>
+                            Keep 100% of tips and earn competitive rates per completed delivery run.
+                        </div>
+                    </div>
+
+                    <div class="driver-perk-item">
+                        <div class="driver-perk-icon">🛡️</div>
+                        <div>
+                            <strong style="color:#0F172A; display:block; font-size:12.5px; margin-bottom:2px;">Fast Verification</strong>
+                            Upload clear photos of your Government ID and OR/CR for 24-hour express account activation.
+                        </div>
+                    </div>
+                </div>
             </section>
         </div>
     </main>
+
+    <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script>
         const accountRadios = document.querySelectorAll('input[name="account_type"]');
         const storeOnlyFields = document.querySelectorAll('[data-store-only]');
         const userOnlyFields = document.querySelectorAll('[data-user-only]');
         const driverOnlyFields = document.querySelectorAll('[data-driver-only]');
-        const storeMapWrap = document.getElementById("store-map-wrap");
-        const userMapWrap = document.getElementById("user-map-wrap");
-        const brandCopy = document.getElementById("brand-copy");
+        
+        const sideMapContainer = document.getElementById("side-map-container");
+        const driverInfoPanel = document.getElementById("driver-info-panel");
+        const sideMapTitle = document.getElementById("side-map-title");
+        const sideMapDesc = document.getElementById("side-map-desc");
+        const mapStatusText = document.getElementById("map-status-text");
+
         const storeAddressInput = document.getElementById("store_address");
         const storeNameInput = document.getElementById("store_name");
         const storeLatInput = document.getElementById("store_lat");
         const storeLngInput = document.getElementById("store_lng");
-        const storeMapStatus = document.getElementById("store-map-status");
+        
         const userAddressInput = document.getElementById("user_address");
         const userLatInput = document.getElementById("user_lat");
         const userLngInput = document.getElementById("user_lng");
-        const userMapStatus = document.getElementById("user-map-status");
+        
+        const userMapEl = document.getElementById("user-map");
+        const storeMapEl = document.getElementById("store-map");
 
         let storeMap = null;
         let storeMarker = null;
         let userMap = null;
         let userMarker = null;
 
-        function setStoreMapStatus(message) {
-            if (storeMapStatus) {
-                storeMapStatus.textContent = message;
+        function setStatus(msg) {
+            if (mapStatusText) {
+                mapStatusText.textContent = msg;
             }
         }
 
-        function setUserMapStatus(message) {
-            if (userMapStatus) {
-                userMapStatus.textContent = message;
+        function togglePasswordVisibility(inputId, btn) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            if (input.type === "password") {
+                input.type = "text";
+                btn.style.color = "#FF4D2E";
+            } else {
+                input.type = "password";
+                btn.style.color = "#94A3B8";
             }
         }
 
         function setStoreMarker(latlng) {
-            if (!storeMap) {
-                return;
-            }
+            if (!storeMap) return;
             if (storeMarker) {
                 storeMarker.setLatLng(latlng);
             } else {
@@ -542,13 +1104,11 @@ if ($cat_res) {
             }
             storeLatInput.value = latlng.lat.toFixed(6);
             storeLngInput.value = latlng.lng.toFixed(6);
-            setStoreMapStatus(`Pinned at ${storeLatInput.value}, ${storeLngInput.value}`);
+            setStatus(`Pinned: ${storeLatInput.value}, ${storeLngInput.value}`);
         }
 
         function setUserMarker(latlng) {
-            if (!userMap) {
-                return;
-            }
+            if (!userMap) return;
             if (userMarker) {
                 userMarker.setLatLng(latlng);
             } else {
@@ -556,13 +1116,13 @@ if ($cat_res) {
             }
             userLatInput.value = latlng.lat.toFixed(6);
             userLngInput.value = latlng.lng.toFixed(6);
-            setUserMapStatus(`Pinned at ${userLatInput.value}, ${userLngInput.value}`);
+            setStatus(`Pinned: ${userLatInput.value}, ${userLngInput.value}`);
         }
 
         async function reverseGeocodeUserAddress(lat, lng) {
             if (!userAddressInput) return;
             try {
-                setUserMapStatus("Looking up address…");
+                setStatus("Looking up address…");
                 const res = await fetch(
                     `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&zoom=18&addressdetails=0`,
                     { cache: "force-cache" }
@@ -571,20 +1131,21 @@ if ($cat_res) {
                 const data = await res.json();
                 if (data && data.display_name) {
                     userAddressInput.value = data.display_name;
-                    setUserMapStatus(`Pinned at ${lat.toFixed(6)}, ${lng.toFixed(6)}.`);
+                    setStatus(`Pinned: ${lat.toFixed(5)}, ${lng.toFixed(5)}`);
                 }
             } catch (e) {
-                setUserMapStatus(`Pinned at ${lat.toFixed(6)}, ${lng.toFixed(6)}.`);
+                setStatus(`Pinned: ${lat.toFixed(5)}, ${lng.toFixed(5)}`);
             }
         }
 
         function initStoreMap() {
             if (storeMap) {
+                setTimeout(() => storeMap.invalidateSize(), 50);
                 return;
             }
-            storeMap = L.map("store-map").setView([0, 0], 2);
+            storeMap = L.map("store-map").setView([14.5995, 120.9842], 13);
             L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-                attribution: "&copy; OpenStreetMap contributors"
+                attribution: "&copy; OpenStreetMap"
             }).addTo(storeMap);
 
             storeMap.on("click", (event) => {
@@ -602,10 +1163,10 @@ if ($cat_res) {
                     (position) => {
                         const coords = [position.coords.latitude, position.coords.longitude];
                         storeMap.setView(coords, 14);
-                        setStoreMapStatus("Tap the map to pin your store.");
+                        setStatus("Tap map to pin your store");
                     },
                     () => {
-                        setStoreMapStatus("Tap the map to pin your store.");
+                        setStatus("Tap map to pin your store");
                     },
                     { enableHighAccuracy: true, timeout: 8000 }
                 );
@@ -614,11 +1175,12 @@ if ($cat_res) {
 
         function initUserMap() {
             if (userMap) {
+                setTimeout(() => userMap.invalidateSize(), 50);
                 return;
             }
-            userMap = L.map("user-map").setView([0, 0], 2);
+            userMap = L.map("user-map").setView([14.5995, 120.9842], 13);
             L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-                attribution: "&copy; OpenStreetMap contributors"
+                attribution: "&copy; OpenStreetMap"
             }).addTo(userMap);
 
             userMap.on("click", (event) => {
@@ -637,10 +1199,10 @@ if ($cat_res) {
                     (position) => {
                         const coords = [position.coords.latitude, position.coords.longitude];
                         userMap.setView(coords, 14);
-                        setUserMapStatus("Tap the map to pin your delivery location.");
+                        setStatus("Tap map to pin delivery location");
                     },
                     () => {
-                        setUserMapStatus("Tap the map to pin your delivery location.");
+                        setStatus("Tap map to pin delivery location");
                     },
                     { enableHighAccuracy: true, timeout: 8000 }
                 );
@@ -677,25 +1239,36 @@ if ($cat_res) {
                 userLngInput.disabled = isStore || isDriver;
             }
 
-            if (storeMapWrap) {
-                storeMapWrap.hidden = !isStore;
-            }
-            if (userMapWrap) {
-                userMapWrap.hidden = isStore || isDriver;
-            }
-            if (brandCopy) {
-                brandCopy.hidden = true;
-            }
+            // Adjust Right Panel
+            if (isDriver) {
+                sideMapContainer.style.display = "none";
+                driverInfoPanel.style.display = "flex";
+            } else {
+                sideMapContainer.style.display = "flex";
+                driverInfoPanel.style.display = "none";
 
-            if (isStore) {
-                initStoreMap();
-                if (storeMap) {
-                    setTimeout(() => storeMap.invalidateSize(), 0);
-                }
-            } else if (!isDriver) {
-                initUserMap();
-                if (userMap) {
-                    setTimeout(() => userMap.invalidateSize(), 0);
+                if (isStore) {
+                    sideMapTitle.textContent = "Pin Store Location";
+                    sideMapDesc.textContent = "Drop a pin to help customers find your store";
+                    userMapEl.style.display = "none";
+                    storeMapEl.style.display = "block";
+                    initStoreMap();
+                    if (storeLatInput.value && storeLngInput.value) {
+                        setStatus(`Pinned: ${storeLatInput.value}, ${storeLngInput.value}`);
+                    } else {
+                        setStatus("Tap map to pin store location");
+                    }
+                } else {
+                    sideMapTitle.textContent = "Pin Delivery Location";
+                    sideMapDesc.textContent = "Drop a pin to ensure accurate home delivery";
+                    storeMapEl.style.display = "none";
+                    userMapEl.style.display = "block";
+                    initUserMap();
+                    if (userLatInput.value && userLngInput.value) {
+                        setStatus(`Pinned: ${userLatInput.value}, ${userLngInput.value}`);
+                    } else {
+                        setStatus("Tap map to pin delivery location");
+                    }
                 }
             }
         }
@@ -704,41 +1277,55 @@ if ($cat_res) {
             radio.addEventListener("change", toggleAccountMode);
         });
 
+        // Initialize mode
         toggleAccountMode();
 
         /* ── Current Location Geolocation Button Handler ── */
         function fetchCurrentLocation() {
             if (!("geolocation" in navigator)) {
-                setUserMapStatus("Geolocation is not supported by your browser.");
+                setStatus("Geolocation is not supported by your browser.");
                 return;
             }
 
             const btnMap = document.getElementById("use-current-location");
             const btnField = document.getElementById("use-current-location-field-btn");
 
-            if (btnMap) { btnMap.disabled = true; btnMap.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite;"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg> <span>Locating…</span>'; }
-            if (btnField) { btnField.disabled = true; btnField.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite;"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg> <span>Locating…</span>'; }
-            setUserMapStatus("Getting your current location…");
+            if (btnMap) { btnMap.disabled = true; btnMap.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="2" x2="12" y2="6"/></svg> <span>Locating…</span>'; }
+            if (btnField) { btnField.disabled = true; btnField.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite;"><circle cx="12" cy="12" r="10"/></svg> <span>Locating…</span>'; }
+            setStatus("Getting GPS location…");
+
+            const selected = document.querySelector('input[name="account_type"]:checked')?.value || "user";
+            const isStore = selected === "store";
 
             navigator.geolocation.getCurrentPosition(
                 (position) => {
                     const lat = position.coords.latitude;
                     const lng = position.coords.longitude;
-                    initUserMap();
-                    if (typeof setUserMarker === "function" && userMap) {
-                        setUserMarker({ lat, lng });
-                        userMap.setView([lat, lng], 15);
+                    
+                    if (isStore) {
+                        initStoreMap();
+                        if (typeof setStoreMarker === "function" && storeMap) {
+                            setStoreMarker({ lat, lng });
+                            storeMap.setView([lat, lng], 15);
+                        }
+                    } else {
+                        initUserMap();
+                        if (typeof setUserMarker === "function" && userMap) {
+                            setUserMarker({ lat, lng });
+                            userMap.setView([lat, lng], 15);
+                        }
+                        reverseGeocodeUserAddress(lat, lng);
                     }
-                    reverseGeocodeUserAddress(lat, lng);
-                    const iconHtml = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>';
-                    if (btnMap) { btnMap.disabled = false; btnMap.innerHTML = `${iconHtml} <span>Use my current location</span>`; }
-                    if (btnField) { btnField.disabled = false; btnField.innerHTML = `${iconHtml} <span>Use current location</span>`; }
+
+                    const mapIconHtml = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>';
+                    if (btnMap) { btnMap.disabled = false; btnMap.innerHTML = `${mapIconHtml} <span>Use My GPS</span>`; }
+                    if (btnField) { btnField.disabled = false; btnField.innerHTML = `${mapIconHtml} <span>GPS</span>`; }
                 },
                 () => {
-                    setUserMapStatus("Unable to access current location. Please check browser permissions.");
-                    const iconHtml = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>';
-                    if (btnMap) { btnMap.disabled = false; btnMap.innerHTML = `${iconHtml} <span>Use my current location</span>`; }
-                    if (btnField) { btnField.disabled = false; btnField.innerHTML = `${iconHtml} <span>Use current location</span>`; }
+                    setStatus("Location access denied or unavailable.");
+                    const mapIconHtml = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>';
+                    if (btnMap) { btnMap.disabled = false; btnMap.innerHTML = `${mapIconHtml} <span>Use My GPS</span>`; }
+                    if (btnField) { btnField.disabled = false; btnField.innerHTML = `${mapIconHtml} <span>GPS</span>`; }
                 },
                 { enableHighAccuracy: true, timeout: 10000 }
             );
@@ -759,7 +1346,6 @@ if ($cat_res) {
 
             if (!addrInput || !addrSugBox) return;
 
-            // Move dropdown to <body> to escape CSS Grid stacking context
             document.body.appendChild(addrSugBox);
 
             let debounceTimer  = null;
@@ -827,12 +1413,11 @@ if ($cat_res) {
                 const lng = parseFloat(r.lon);
                 if (addrLatInp) addrLatInp.value = lat.toFixed(6);
                 if (addrLngInp) addrLngInp.value = lng.toFixed(6);
-                // ensure map is ready, then move marker
                 if (typeof initUserMap === "function") initUserMap();
                 if (typeof setUserMarker === "function" && userMap) {
                     setUserMarker({ lat, lng });
                     userMap.setView([lat, lng], 15);
-                    setUserMapStatus(`Pinned at ${lat.toFixed(6)}, ${lng.toFixed(6)}.`);
+                    setStatus(`Pinned: ${lat.toFixed(5)}, ${lng.toFixed(5)}`);
                 }
                 closeSuggestions();
                 addrInput.focus();
@@ -841,7 +1426,7 @@ if ($cat_res) {
             async function fetchSuggestions(query) {
                 showSpinner(true);
                 try {
-                    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&limit=6&addressdetails=0`;
+                    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&limit=5&addressdetails=0`;
                     const res = await fetch(url, { cache: "no-store" });
                     if (!res.ok) throw new Error("Network error");
                     const data = await res.json();
@@ -888,10 +1473,6 @@ if ($cat_res) {
                 setTimeout(closeSuggestions, 180);
             });
 
-            // Keep dropdown aligned on scroll or resize
-            window.addEventListener("scroll", () => {
-                if (addrSugBox.classList.contains("open")) positionDropdown();
-            }, true);
             window.addEventListener("resize", () => {
                 if (addrSugBox.classList.contains("open")) positionDropdown();
             });
