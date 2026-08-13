@@ -236,6 +236,100 @@ if ($cat_res) {
     <title>Register | Lokal</title>
     <link rel="stylesheet" href="assets/styles.css?v=primary-bw-icons-1">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    <style>
+        .address-autofill-wrap {
+            position: relative;
+        }
+        .address-suggestions {
+            position: fixed;
+            background: #fff;
+            border: 1px solid rgba(255,91,46,.28);
+            border-radius: 10px;
+            box-shadow: 0 8px 28px rgba(0,0,0,.15);
+            z-index: 999999;
+            overflow-y: auto;
+            display: none;
+            max-height: 240px;
+        }
+        .address-suggestions.open {
+            display: block;
+        }
+        .address-suggestion-item {
+            padding: 10px 14px;
+            font-size: 13px;
+            color: #333;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(0,0,0,.06);
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            transition: background .15s;
+        }
+        .address-suggestion-item:last-child {
+            border-bottom: none;
+        }
+        .address-suggestion-item:hover,
+        .address-suggestion-item.active {
+            background: rgba(255,91,46,.08);
+        }
+        .address-suggestion-item .sug-icon {
+            flex-shrink: 0;
+            margin-top: 1px;
+            color: #ff5b2e;
+            font-size: 14px;
+        }
+        .address-suggestion-item .sug-text {
+            line-height: 1.4;
+        }
+        .address-suggestion-item .sug-text strong {
+            display: block;
+            font-weight: 600;
+            color: #222;
+        }
+        .address-suggestion-item .sug-text span {
+            color: #777;
+            font-size: 12px;
+        }
+        .address-autofill-spinner {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,91,46,.2);
+            border-top-color: #ff5b2e;
+            border-radius: 50%;
+            animation: spin .7s linear infinite;
+            display: none;
+            pointer-events: none;
+        }
+        .address-autofill-spinner.visible {
+            display: block;
+        }
+        @keyframes spin { to { transform: translateY(-50%) rotate(360deg); } }
+
+        .profile-location-btn {
+            border: 1px solid rgba(255, 91, 46, 0.22);
+            border-radius: 10px;
+            padding: 8px 14px;
+            background: rgba(255, 91, 46, 0.1);
+            color: #FF5B2E;
+            cursor: pointer;
+            font: inherit;
+            font-size: 13px;
+            font-weight: 700;
+            transition: background 0.15s ease, opacity 0.15s ease;
+        }
+        .profile-location-btn:hover,
+        .profile-location-btn:focus-visible {
+            background: rgba(255, 91, 46, 0.18);
+        }
+        .profile-location-btn:disabled {
+            cursor: wait;
+            opacity: 0.68;
+        }
+    </style>
 </head>
 <body>
     <main class="auth-shell">
@@ -256,6 +350,9 @@ if ($cat_res) {
                     <div class="store-map-wrap" id="user-map-wrap">
                         <h2>Delivery location</h2>
                         <p class="status-text">Tap the map to drop a pin for your delivery address.</p>
+                        <div style="margin-bottom:10px;">
+                            <button class="profile-location-btn" id="use-current-location" type="button">📍 Use my current location</button>
+                        </div>
                         <div id="user-map"></div>
                         <div class="map-status" id="user-map-status">No location pinned yet.</div>
                     </div>
@@ -312,8 +409,15 @@ if ($cat_res) {
                         </select>
                     </div>
                     <div class="field user-only" data-user-only>
-                        <label for="user_address">Delivery address</label>
-                        <input type="text" id="user_address" name="user_address" value="<?php echo escape($values["user_address"]); ?>" placeholder="Street, city, province" autocomplete="street-address">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                            <label for="user_address" style="margin-bottom:0;">Delivery address</label>
+                            <button class="profile-location-btn" id="use-current-location-field-btn" type="button" style="padding: 4px 10px; font-size: 11.5px;">📍 Use current location</button>
+                        </div>
+                        <div class="address-autofill-wrap">
+                            <input type="text" id="user_address" name="user_address" value="<?php echo escape($values["user_address"]); ?>" placeholder="Start typing your delivery address…" autocomplete="off">
+                            <div class="address-autofill-spinner" id="user-addr-spinner"></div>
+                            <div class="address-suggestions" id="user-addr-suggestions" role="listbox" aria-label="Address suggestions"></div>
+                        </div>
                         <input type="hidden" id="user_lat" name="user_lat" value="<?php echo escape($values["user_lat"]); ?>">
                         <input type="hidden" id="user_lng" name="user_lng" value="<?php echo escape($values["user_lng"]); ?>">
                     </div>
@@ -433,6 +537,25 @@ if ($cat_res) {
             setUserMapStatus(`Pinned at ${userLatInput.value}, ${userLngInput.value}`);
         }
 
+        async function reverseGeocodeUserAddress(lat, lng) {
+            if (!userAddressInput) return;
+            try {
+                setUserMapStatus("Looking up address…");
+                const res = await fetch(
+                    `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&zoom=18&addressdetails=0`,
+                    { cache: "force-cache" }
+                );
+                if (!res.ok) return;
+                const data = await res.json();
+                if (data && data.display_name) {
+                    userAddressInput.value = data.display_name;
+                    setUserMapStatus(`Pinned at ${lat.toFixed(6)}, ${lng.toFixed(6)}.`);
+                }
+            } catch (e) {
+                setUserMapStatus(`Pinned at ${lat.toFixed(6)}, ${lng.toFixed(6)}.`);
+            }
+        }
+
         function initStoreMap() {
             if (storeMap) {
                 return;
@@ -478,6 +601,7 @@ if ($cat_res) {
 
             userMap.on("click", (event) => {
                 setUserMarker(event.latlng);
+                reverseGeocodeUserAddress(event.latlng.lat, event.latlng.lng);
             });
 
             if (userLatInput.value && userLngInput.value) {
@@ -559,6 +683,195 @@ if ($cat_res) {
         });
 
         toggleAccountMode();
+
+        /* ── Current Location Geolocation Button Handler ── */
+        function fetchCurrentLocation() {
+            if (!("geolocation" in navigator)) {
+                setUserMapStatus("Geolocation is not supported by your browser.");
+                return;
+            }
+
+            const btnMap = document.getElementById("use-current-location");
+            const btnField = document.getElementById("use-current-location-field-btn");
+
+            if (btnMap) { btnMap.disabled = true; btnMap.textContent = "Locating…"; }
+            if (btnField) { btnField.disabled = true; btnField.textContent = "Locating…"; }
+            setUserMapStatus("Getting your current location…");
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    initUserMap();
+                    if (typeof setUserMarker === "function" && userMap) {
+                        setUserMarker({ lat, lng });
+                        userMap.setView([lat, lng], 15);
+                    }
+                    reverseGeocodeUserAddress(lat, lng);
+                    if (btnMap) { btnMap.disabled = false; btnMap.textContent = "📍 Use my current location"; }
+                    if (btnField) { btnField.disabled = false; btnField.textContent = "📍 Use current location"; }
+                },
+                () => {
+                    setUserMapStatus("Unable to access current location. Please check browser permissions.");
+                    if (btnMap) { btnMap.disabled = false; btnMap.textContent = "📍 Use my current location"; }
+                    if (btnField) { btnField.disabled = false; btnField.textContent = "📍 Use current location"; }
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        }
+
+        const mapLocBtn = document.getElementById("use-current-location");
+        const fieldLocBtn = document.getElementById("use-current-location-field-btn");
+        if (mapLocBtn) mapLocBtn.addEventListener("click", fetchCurrentLocation);
+        if (fieldLocBtn) fieldLocBtn.addEventListener("click", fetchCurrentLocation);
+
+        /* ── Address Autofill (Nominatim) for user delivery address ── */
+        (function () {
+            const addrInput   = document.getElementById("user_address");
+            const addrSugBox  = document.getElementById("user-addr-suggestions");
+            const addrSpinner = document.getElementById("user-addr-spinner");
+            const addrLatInp  = document.getElementById("user_lat");
+            const addrLngInp  = document.getElementById("user_lng");
+
+            if (!addrInput || !addrSugBox) return;
+
+            // Move dropdown to <body> to escape CSS Grid stacking context
+            document.body.appendChild(addrSugBox);
+
+            let debounceTimer  = null;
+            let activeIndex    = -1;
+            let currentResults = [];
+
+            function positionDropdown() {
+                const rect = addrInput.getBoundingClientRect();
+                addrSugBox.style.top   = (rect.bottom + 4) + "px";
+                addrSugBox.style.left  = rect.left + "px";
+                addrSugBox.style.width = rect.width + "px";
+            }
+
+            function showSpinner(show) {
+                addrSpinner && addrSpinner.classList.toggle("visible", show);
+            }
+
+            function closeSuggestions() {
+                addrSugBox.classList.remove("open");
+                addrSugBox.innerHTML = "";
+                activeIndex    = -1;
+                currentResults = [];
+            }
+
+            function openSuggestions(results) {
+                addrSugBox.innerHTML = "";
+                currentResults = results;
+                activeIndex    = -1;
+                if (!results.length) {
+                    const empty = document.createElement("div");
+                    empty.className = "address-suggestion-item";
+                    empty.innerHTML = `<span class="sug-icon">⚠</span><span class="sug-text"><strong>No results found</strong><span>Try a more specific address</span></span>`;
+                    addrSugBox.appendChild(empty);
+                } else {
+                    results.forEach((r, i) => {
+                        const parts     = r.display_name.split(", ");
+                        const primary   = parts.slice(0, 2).join(", ");
+                        const secondary = parts.slice(2).join(", ");
+                        const item      = document.createElement("div");
+                        item.className  = "address-suggestion-item";
+                        item.setAttribute("role", "option");
+                        item.setAttribute("data-index", i);
+                        item.innerHTML  = `<span class="sug-icon">📍</span><span class="sug-text"><strong>${primary}</strong><span>${secondary}</span></span>`;
+                        item.addEventListener("mousedown", (e) => {
+                            e.preventDefault();
+                            selectResult(i);
+                        });
+                        addrSugBox.appendChild(item);
+                    });
+                }
+                positionDropdown();
+                addrSugBox.classList.add("open");
+            }
+
+            function highlightItem(index) {
+                const items = addrSugBox.querySelectorAll(".address-suggestion-item");
+                items.forEach((el, i) => el.classList.toggle("active", i === index));
+            }
+
+            function selectResult(index) {
+                const r = currentResults[index];
+                if (!r) return;
+                addrInput.value = r.display_name;
+                const lat = parseFloat(r.lat);
+                const lng = parseFloat(r.lon);
+                if (addrLatInp) addrLatInp.value = lat.toFixed(6);
+                if (addrLngInp) addrLngInp.value = lng.toFixed(6);
+                // ensure map is ready, then move marker
+                if (typeof initUserMap === "function") initUserMap();
+                if (typeof setUserMarker === "function" && userMap) {
+                    setUserMarker({ lat, lng });
+                    userMap.setView([lat, lng], 15);
+                    setUserMapStatus(`Pinned at ${lat.toFixed(6)}, ${lng.toFixed(6)}.`);
+                }
+                closeSuggestions();
+                addrInput.focus();
+            }
+
+            async function fetchSuggestions(query) {
+                showSpinner(true);
+                try {
+                    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&limit=6&addressdetails=0`;
+                    const res = await fetch(url, { cache: "no-store" });
+                    if (!res.ok) throw new Error("Network error");
+                    const data = await res.json();
+                    openSuggestions(data);
+                } catch (err) {
+                    closeSuggestions();
+                } finally {
+                    showSpinner(false);
+                }
+            }
+
+            addrInput.addEventListener("input", () => {
+                clearTimeout(debounceTimer);
+                const val = addrInput.value.trim();
+                if (val.length < 3) {
+                    closeSuggestions();
+                    showSpinner(false);
+                    return;
+                }
+                showSpinner(true);
+                debounceTimer = setTimeout(() => fetchSuggestions(val), 400);
+            });
+
+            addrInput.addEventListener("keydown", (e) => {
+                const items = addrSugBox.querySelectorAll(".address-suggestion-item[data-index]");
+                if (!addrSugBox.classList.contains("open") || !items.length) return;
+                if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    activeIndex = (activeIndex + 1) % items.length;
+                    highlightItem(activeIndex);
+                } else if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    activeIndex = (activeIndex - 1 + items.length) % items.length;
+                    highlightItem(activeIndex);
+                } else if (e.key === "Enter" && activeIndex >= 0) {
+                    e.preventDefault();
+                    selectResult(activeIndex);
+                } else if (e.key === "Escape") {
+                    closeSuggestions();
+                }
+            });
+
+            addrInput.addEventListener("blur", () => {
+                setTimeout(closeSuggestions, 180);
+            });
+
+            // Keep dropdown aligned on scroll or resize
+            window.addEventListener("scroll", () => {
+                if (addrSugBox.classList.contains("open")) positionDropdown();
+            }, true);
+            window.addEventListener("resize", () => {
+                if (addrSugBox.classList.contains("open")) positionDropdown();
+            });
+        })();
     </script>
 </body>
 </html>
