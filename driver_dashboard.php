@@ -53,35 +53,34 @@ function fetch_live_gps_history(mysqli $mysqli, int $limit = 30): array
     return array_reverse($history);
 }
 
-function build_live_payload(mysqli $mysqli): array
-{
-    $history = fetch_live_gps_history($mysqli, 30);
-    $current = $history ? $history[count($history) - 1] : null;
-
-    return [
-        "ok" => true,
-        "source" => "gps_logs",
-        "refresh_interval_seconds" => 10,
-        "generated_at" => date(DATE_ATOM),
-        "current" => $current,
-        "history" => $history,
-        "orders" => fetch_driver_orders($mysqli),
-    ];
-}
-
 function fetch_driver_orders(mysqli $mysqli): array
 {
     $orders = [];
     $result = $mysqli->query(
         "SELECT o.id, o.customer_name, u.contact AS customer_contact, o.delivery_address,
                 o.store_name, o.store_address, o.store_lat, o.store_lng,
-                o.delivery_lat, o.delivery_lng, o.total_amount, o.status, o.created_at, o.accepted_at, o.pickup_at
+                o.delivery_lat, o.delivery_lng, o.total_amount, o.subtotal_amount,
+                o.delivery_fee, o.delivery_distance_km, o.status, o.created_at,
+                o.accepted_at, o.pickup_at, o.delivered_at,
+                su.contact AS store_contact, su.store_contact AS store_alt_contact
          FROM orders o
          LEFT JOIN users u ON u.id = o.customer_user_id
+         LEFT JOIN users su ON su.id = o.store_user_id
          WHERE o.order_type = 'delivery'
-           AND status IN ('pending', 'for_pickup', 'delivering')
-         ORDER BY FIELD(status, 'for_pickup', 'delivering', 'pending'), created_at ASC
-         LIMIT 25"
+           AND (
+             o.status IN ('pending', 'for_pickup', 'delivering')
+             OR (o.status = 'completed' AND DATE(o.delivered_at) = CURRENT_DATE())
+           )
+         ORDER BY 
+           CASE o.status
+             WHEN 'delivering' THEN 1
+             WHEN 'for_pickup' THEN 2
+             WHEN 'pending' THEN 3
+             WHEN 'completed' THEN 4
+             ELSE 5
+           END,
+           o.created_at DESC
+         LIMIT 30"
     );
 
     if (!$result) {
@@ -90,6 +89,7 @@ function fetch_driver_orders(mysqli $mysqli): array
 
     while ($row = $result->fetch_assoc()) {
         $orderId = (int) $row["id"];
+        $storeContact = !empty($row["store_alt_contact"]) ? (string) $row["store_alt_contact"] : (string) ($row["store_contact"] ?? "");
         $orders[$orderId] = [
             "id" => $orderId,
             "customer_name" => (string) ($row["customer_name"] ?? "Customer"),
@@ -97,15 +97,20 @@ function fetch_driver_orders(mysqli $mysqli): array
             "delivery_address" => (string) ($row["delivery_address"] ?? ""),
             "store_name" => (string) ($row["store_name"] ?? "Store"),
             "store_address" => (string) ($row["store_address"] ?? ""),
+            "store_contact" => $storeContact,
             "store_lat" => isset($row["store_lat"]) ? (float) $row["store_lat"] : null,
             "store_lng" => isset($row["store_lng"]) ? (float) $row["store_lng"] : null,
             "delivery_lat" => isset($row["delivery_lat"]) ? (float) $row["delivery_lat"] : null,
             "delivery_lng" => isset($row["delivery_lng"]) ? (float) $row["delivery_lng"] : null,
+            "subtotal_amount" => isset($row["subtotal_amount"]) ? (float) $row["subtotal_amount"] : 0,
+            "delivery_fee" => isset($row["delivery_fee"]) ? (float) $row["delivery_fee"] : 0,
+            "delivery_distance_km" => isset($row["delivery_distance_km"]) ? (float) $row["delivery_distance_km"] : 0,
             "total_amount" => isset($row["total_amount"]) ? (float) $row["total_amount"] : 0,
             "status" => (string) ($row["status"] ?? "pending"),
             "created_at" => (string) ($row["created_at"] ?? ""),
             "accepted_at" => (string) ($row["accepted_at"] ?? ""),
             "pickup_at" => (string) ($row["pickup_at"] ?? ""),
+            "delivered_at" => (string) ($row["delivered_at"] ?? ""),
             "items" => [],
         ];
     }
@@ -139,6 +144,22 @@ function fetch_driver_orders(mysqli $mysqli): array
     }
 
     return array_values($orders);
+}
+
+function build_live_payload(mysqli $mysqli): array
+{
+    $history = fetch_live_gps_history($mysqli, 30);
+    $current = $history ? $history[count($history) - 1] : null;
+
+    return [
+        "ok" => true,
+        "source" => "gps_logs",
+        "refresh_interval_seconds" => 10,
+        "generated_at" => date(DATE_ATOM),
+        "current" => $current,
+        "history" => $history,
+        "orders" => fetch_driver_orders($mysqli),
+    ];
 }
 
 function update_order_status(mysqli $mysqli, int $orderId, string $action): array
@@ -202,7 +223,7 @@ function build_google_maps_url(?array $current): string
     return "https://www.google.com/maps?q=" . $current["lat"] . "," . $current["lng"];
 }
 
-if ($_SERVER["REQUEST_METHOD"] === "POST") {
+if (($_SERVER["REQUEST_METHOD"] ?? "") === "POST") {
     header("Content-Type: application/json; charset=UTF-8");
     $input = json_decode(file_get_contents("php://input"), true);
     $action = is_array($input) ? (string) ($input["action"] ?? "") : "";
@@ -227,9 +248,7 @@ if (isset($_GET["format"]) && $_GET["format"] === "json") {
 
 $current = $payload["current"];
 $googleMapsUrl = build_google_maps_url($current);
-$initialStatus = $current
-    ? "Live GPS connected. Last device update: " . display_value($current["created_at"])
-    : "Waiting for GPS logs with latitude and longitude.";
+$driverName = $_SESSION["user_name"] ?? "Rider";
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -239,124 +258,360 @@ $initialStatus = $current
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Driver Dashboard | Lokal</title>
     <link rel="stylesheet" href="assets/styles.css?v=primary-bw-icons-1">
-    <link rel="stylesheet" href="assets/home.css?v=hover-effects-1">
+    <link rel="stylesheet" href="assets/home.css?v=driver-clean-1">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    <style>
+        .driver-orders-sidebar {
+            width: 380px;
+            min-width: 380px;
+            height: 100vh;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(24px);
+            border-right: 1px solid #E2E8F0;
+            display: flex;
+            flex-direction: column;
+            z-index: 1000;
+            flex-shrink: 0;
+            box-sizing: border-box;
+            transition: margin-left 0.35s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 10px 0 30px rgba(15, 23, 42, 0.06);
+        }
+
+        .sidebar-collapsed .driver-orders-sidebar {
+            margin-left: -380px;
+        }
+
+        .driver-order-card {
+            padding: 16px;
+            border-radius: 16px;
+            border: 1.5px solid #E2E8F0;
+            background: #FFFFFF;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            transition: all 0.2s ease;
+            box-sizing: border-box;
+            width: 100%;
+        }
+
+        .driver-order-card:hover {
+            border-color: #CBD5E1;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+        }
+
+        .driver-order-card.active {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 1px var(--primary), 0 6px 16px var(--primary-light);
+        }
+
+        .driver-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .driver-card-id {
+            font-family: "Outfit", sans-serif;
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--ink);
+            margin: 0;
+        }
+
+        .driver-status-badge {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 9px;
+            border-radius: 999px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-pending { background: #FEF3C7; color: #B45309; }
+        .status-for_pickup { background: #DBEAFE; color: #1D4ED8; }
+        .status-delivering { background: #D1FAE5; color: #047857; }
+        .status-completed { background: #F1F5F9; color: #475569; }
+
+        .driver-route-block {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            background: #F8FAFC;
+            border-radius: 12px;
+            padding: 12px;
+            border: 1px solid #F1F5F9;
+        }
+
+        .driver-route-row {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+        }
+
+        .driver-route-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-top: 4px;
+            flex-shrink: 0;
+        }
+
+        .dot-store { background: var(--primary); }
+        .dot-customer { background: var(--secondary); }
+
+        .driver-route-text {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .driver-route-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: #64748B;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .driver-route-val {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--ink);
+            margin: 0;
+            word-break: break-word;
+        }
+
+        .driver-route-sub {
+            font-size: 12px;
+            color: #64748B;
+            margin: 0;
+            word-break: break-word;
+        }
+
+        .driver-order-amount {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 13px;
+            color: #475569;
+            font-weight: 600;
+        }
+
+        .driver-order-total {
+            font-family: "Outfit", sans-serif;
+            font-size: 16px;
+            font-weight: 800;
+            color: var(--primary);
+        }
+
+        .driver-actions-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding-top: 4px;
+        }
+
+        .driver-btn {
+            flex: 1;
+            min-width: 120px;
+            height: 38px;
+            border-radius: 10px;
+            font-family: inherit;
+            font-size: 12.5px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            cursor: pointer;
+            border: 1px solid #E2E8F0;
+            background: #FFFFFF;
+            color: var(--ink);
+            transition: all 0.2s ease;
+            text-decoration: none;
+        }
+
+        .driver-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: var(--primary-light);
+        }
+
+        .driver-btn.btn-primary {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: #FFFFFF;
+        }
+
+        .driver-btn.btn-primary:hover {
+            background: var(--primary-hover);
+        }
+
+        .driver-btn.btn-success {
+            background: var(--secondary);
+            border-color: var(--secondary);
+            color: #FFFFFF;
+        }
+
+        .driver-btn.btn-success:hover {
+            background: var(--secondary-hover);
+        }
+
+        .driver-btn.btn-decline {
+            background: #FFF1F2;
+            border-color: #FECDD3;
+            color: #E11D48;
+        }
+
+        .driver-btn.btn-decline:hover {
+            background: #FFE4E6;
+        }
+
+        .map-locate-action {
+            position: absolute;
+            right: 12px;
+            bottom: 92px;
+            z-index: 1000;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: #FFFFFF;
+            border: 1.5px solid #E2E8F0;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+            transition: all 0.2s ease;
+        }
+
+        .map-locate-action:hover {
+            background: var(--primary-light);
+            border-color: var(--primary);
+            transform: scale(1.05);
+        }
+    </style>
 </head>
-<body class="home-screen driver-dashboard-screen">
-    <main class="home-map-shell">
-        <div id="home-map"></div>
+<body class="home-screen account-driver">
+    <div class="home-layout">
 
-        <button id="menu-toggle" class="menu-toggle" type="button" aria-controls="menu-drawer" aria-expanded="false" aria-label="Open menu">
-            <span></span>
-            <span></span>
-            <span></span>
-        </button>
+        <!-- ── Driver Orders Sidebar ── -->
+        <aside class="driver-orders-sidebar" id="driver-sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-top-bar">
+                    <h2 class="sidebar-title">Driver Orders</h2>
+                    <button type="button" id="sidebar-collapse-btn" class="sidebar-collapse-btn" title="Hide sidebar" aria-label="Hide sidebar">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="15 18 9 12 15 6"></polyline>
+                        </svg>
+                    </button>
+                </div>
 
+                <div class="sidebar-search-row">
+                    <input type="text" id="driver-search-input" class="sidebar-search-input" placeholder="Search order #, customer, store" autocomplete="off">
+                    <button type="button" id="driver-refresh-btn" class="sidebar-locate-btn" title="Refresh data" aria-label="Refresh data">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <polyline points="1 20 1 14 7 14"></polyline>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                        </svg>
+                    </button>
+                </div>
 
-        <aside class="menu-drawer" id="menu-drawer" aria-hidden="true">
-            <div class="menu-head">
-                <img class="menu-logo" src="732961553_1045061465131627_5347302832846310517_n.png" alt="Lokal">
-                <button class="menu-close" id="menu-close" type="button" aria-label="Close menu">&times;</button>
+                <div class="sidebar-categories" id="status-filter-pills">
+                    <button type="button" class="cat-pill active" data-status="all">All</button>
+                    <button type="button" class="cat-pill" data-status="pending">Pending</button>
+                    <button type="button" class="cat-pill" data-status="for_pickup">For Pickup</button>
+                    <button type="button" class="cat-pill" data-status="delivering">Delivering</button>
+                    <button type="button" class="cat-pill" data-status="completed">Completed</button>
+                </div>
             </div>
 
-            <section class="menu-section">
-                <h3>Rider Controls</h3>
-                <button type="button" class="menu-link" id="menu-center-live">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
-                    <span>Center to latest GPS</span>
-                </button>
-                <button type="button" class="menu-link" id="menu-refresh-now">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
-                    <span>Refresh now</span>
-                </button>
-                <a
-                    class="menu-link"
-                    id="menu-open-google"
-                    href="<?php echo escape_value($googleMapsUrl); ?>"
-                    target="_blank"
-                    rel="noopener"
-                    <?php echo $googleMapsUrl === "" ? 'aria-disabled="true"' : ""; ?>
-                >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
-                    <span>Open in Google Maps</span>
-                </a>
-            </section>
-
-            <section class="menu-section">
-                <h3>Live GPS Feed</h3>
-                <p class="menu-meta" id="drawer-feed-status"><?php echo $current ? "Receiving GPS updates from gps_logs." : "No GPS rows with coordinates yet."; ?></p>
-                <p class="menu-meta" id="drawer-device">Device: <?php echo escape_value(display_value($current["device"] ?? null)); ?></p>
-                <p class="menu-meta" id="drawer-status">Status: <?php echo escape_value(display_value($current["status"] ?? null)); ?></p>
-                <p class="menu-meta" id="drawer-device-time">Device time: <?php echo escape_value(display_value($current["device_time"] ?? null)); ?></p>
-                <p class="menu-meta" id="drawer-server-time">Server time: <?php echo escape_value(display_value($current["created_at"] ?? null)); ?></p>
-            </section>
-
-            <section class="menu-section">
-                <h3>Account</h3>
-                <div class="user-card-info">
-                    <div class="user-avatar-circle"><?php echo strtoupper(substr($_SESSION["user_name"] ?? "R", 0, 1)); ?></div>
-                    <div>
-                        <p class="menu-user-name"><?php echo escape_value($_SESSION["user_name"] ?? "Rider"); ?></p>
-                        <p class="menu-user-role">Delivery Rider</p>
-                    </div>
-                </div>
-                <a class="menu-link menu-logout" href="logout.php">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                    <span>Log out</span>
-                </a>
-            </section>
+            <div class="sidebar-store-list" id="driver-orders-list">
+                <!-- Orders dynamic rendering -->
+            </div>
         </aside>
 
-        <div class="menu-backdrop" id="menu-backdrop"></div>
+        <!-- ── Main Map Shell ── -->
+        <main class="home-map-shell">
+            <div id="home-map"></div>
 
-        <section class="driver-dashboard-panel" id="driver-dashboard-panel">
-            <div class="driver-panel-head">
-                <div>
-                    <h1>Driver Dashboard</h1>
-                    <p>Accept orders, follow pickup routes, and switch to delivery once the order is picked up.</p>
-                </div>
-                <div class="driver-panel-controls">
-                    <div class="driver-live-pill">
-                        <span class="driver-live-dot" id="driver-live-dot"></span>
-                        <span id="live-pill-text">Polling every 10 seconds</span>
-                    </div>
-                    <button
-                        type="button"
-                        class="driver-panel-toggle"
-                        id="driver-panel-toggle"
-                        aria-controls="driver-panel-body"
-                        aria-expanded="true"
-                    >Minimize</button>
-                </div>
-            </div>
+            <button id="sidebar-expand-btn" class="sidebar-expand-btn" type="button" aria-label="Show orders sidebar" hidden>
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+                <span>Orders</span>
+            </button>
 
-            <div class="driver-panel-body" id="driver-panel-body">
-                <section class="driver-orders-section">
-                    <div class="driver-orders-head">
-                        <div>
-                            <h2>Orders</h2>
-                            <p id="driver-orders-summary">Waiting for customer checkout.</p>
-                        </div>
-                        <button type="button" class="store-home-link driver-action-btn" id="orders-refresh-now">Refresh orders</button>
-                    </div>
-                    <div class="driver-orders-list" id="driver-orders-list"></div>
+            <!-- Recenter GPS Action Button -->
+            <button type="button" class="map-locate-action" id="map-recenter-btn" title="Center GPS location" aria-label="Center GPS location">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
+                </svg>
+            </button>
+
+            <!-- Navigation Drawer Toggle -->
+            <button id="menu-toggle" class="menu-toggle" type="button" aria-controls="menu-drawer" aria-expanded="false" aria-label="Open menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+
+            <!-- Slide Menu Drawer -->
+            <aside class="menu-drawer" id="menu-drawer" aria-hidden="true">
+                <div class="menu-head">
+                    <img class="menu-logo" src="732961553_1045061465131627_5347302832846310517_n.png" alt="Lokal">
+                    <button class="menu-close" id="menu-close" type="button" aria-label="Close menu">&times;</button>
+                </div>
+
+                <section class="menu-section">
+                    <h3>Rider Controls</h3>
+                    <button type="button" class="menu-link" id="menu-center-live">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                        <span>Center to latest GPS</span>
+                    </button>
+                    <button type="button" class="menu-link" id="menu-refresh-now">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                        <span>Refresh now</span>
+                    </button>
+                    <a class="menu-link" id="menu-open-google" href="<?php echo escape_value($googleMapsUrl); ?>" target="_blank" rel="noopener" <?php echo $googleMapsUrl === "" ? 'aria-disabled="true"' : ""; ?>>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+                        <span>Open in Google Maps</span>
+                    </a>
                 </section>
 
-                <div class="store-home-actions">
-                    <button type="button" class="store-home-link driver-action-btn" id="panel-center-live">Center to latest GPS</button>
-                    <button type="button" class="store-home-link driver-action-btn" id="panel-refresh-now">Refresh now</button>
-                    <a
-                        class="store-home-link"
-                        id="panel-open-google"
-                        href="<?php echo escape_value($googleMapsUrl); ?>"
-                        target="_blank"
-                        rel="noopener"
-                        <?php echo $googleMapsUrl === "" ? 'aria-disabled="true"' : ""; ?>
-                    >Open in Google Maps</a>
-                </div>
-            </div>
-        </section>
-    </main>
+                <section class="menu-section">
+                    <h3>Live GPS Feed</h3>
+                    <p class="menu-meta" id="drawer-feed-status"><?php echo $current ? "Receiving GPS updates from gps_logs." : "No GPS rows with coordinates yet."; ?></p>
+                    <p class="menu-meta" id="drawer-device">Device: <?php echo escape_value(display_value($current["device"] ?? null)); ?></p>
+                    <p class="menu-meta" id="drawer-status">Status: <?php echo escape_value(display_value($current["status"] ?? null)); ?></p>
+                    <p class="menu-meta" id="drawer-device-time">Device time: <?php echo escape_value(display_value($current["device_time"] ?? null)); ?></p>
+                    <p class="menu-meta" id="drawer-server-time">Server time: <?php echo escape_value(display_value($current["created_at"] ?? null)); ?></p>
+                </section>
+
+                <section class="menu-section">
+                    <h3>Account</h3>
+                    <div class="user-card-info">
+                        <div class="user-avatar-circle"><?php echo strtoupper(substr($driverName, 0, 1)); ?></div>
+                        <div>
+                            <p class="menu-user-name"><?php echo escape_value($driverName); ?></p>
+                            <p class="menu-user-role">Delivery Rider</p>
+                        </div>
+                    </div>
+                    <a class="menu-link menu-logout" href="logout.php">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                        <span>Log out</span>
+                    </a>
+                </section>
+            </aside>
+
+            <div class="menu-backdrop" id="menu-backdrop"></div>
+        </main>
+    </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script>
@@ -364,7 +619,7 @@ $initialStatus = $current
         const refreshIntervalMs = (livePayload.refresh_interval_seconds || 10) * 1000;
         const defaultCenter = [14.5995, 120.9842];
 
-        const map = L.map("home-map", { zoomControl: false }).setView(defaultCenter, 12);
+        const map = L.map("home-map", { zoomControl: false }).setView(defaultCenter, 13);
         L.control.zoom({ position: "bottomright" }).addTo(map);
 
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -388,131 +643,74 @@ $initialStatus = $current
             popupAnchor: [0, -30]
         });
 
-        const statusEl = document.getElementById("map-status");
+        const storeIcon = L.divIcon({
+            className: "custom-marker",
+            html: `<div class="map-marker" style="background:#FFFFFF; color:var(--primary); border-color:var(--primary);">
+                    <svg class="marker-svg" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                </div>`,
+            iconSize: [34, 34],
+            iconAnchor: [17, 34],
+            popupAnchor: [0, -30]
+        });
+
+        const customerIcon = L.divIcon({
+            className: "custom-marker",
+            html: `<div class="map-marker" style="background:#FFFFFF; color:var(--secondary); border-color:var(--secondary);">
+                    <svg class="marker-svg" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                        <circle cx="12" cy="10" r="3"></circle>
+                    </svg>
+                </div>`,
+            iconSize: [34, 34],
+            iconAnchor: [17, 34],
+            popupAnchor: [0, -30]
+        });
+
         const menuDrawer = document.getElementById("menu-drawer");
         const menuToggle = document.getElementById("menu-toggle");
         const menuClose = document.getElementById("menu-close");
         const menuBackdrop = document.getElementById("menu-backdrop");
-        const liveDot = document.getElementById("driver-live-dot");
-        const livePillText = document.getElementById("live-pill-text");
-        const driverPanel = document.getElementById("driver-dashboard-panel");
-        const driverPanelBody = document.getElementById("driver-panel-body");
-        const driverPanelToggle = document.getElementById("driver-panel-toggle");
-        const drawerFeedStatus = document.getElementById("drawer-feed-status");
-        const drawerDevice = document.getElementById("drawer-device");
-        const drawerStatus = document.getElementById("drawer-status");
-        const drawerDeviceTime = document.getElementById("drawer-device-time");
-        const drawerServerTime = document.getElementById("drawer-server-time");
-        const detailIds = {
-            device: document.getElementById("detail-device"),
-            status: document.getElementById("detail-status"),
-            coordinates: document.getElementById("detail-coordinates"),
-            sat: document.getElementById("detail-sat"),
-            hdop: document.getElementById("detail-hdop"),
-            valid: document.getElementById("detail-valid"),
-            device_time: document.getElementById("detail-device-time"),
-            created_at: document.getElementById("detail-server-time"),
-            chars_count: document.getElementById("detail-chars"),
-            updated: document.getElementById("detail-updated")
-        };
-        const panelNote = document.getElementById("driver-panel-note");
-        const menuOpenGoogle = document.getElementById("menu-open-google");
-        const panelOpenGoogle = document.getElementById("panel-open-google");
+        const sidebar = document.getElementById("driver-sidebar");
+        const sidebarCollapseBtn = document.getElementById("sidebar-collapse-btn");
+        const sidebarExpandBtn = document.getElementById("sidebar-expand-btn");
         const ordersListEl = document.getElementById("driver-orders-list");
-        const ordersSummaryEl = document.getElementById("driver-orders-summary");
+        const searchInput = document.getElementById("driver-search-input");
+        const menuOpenGoogle = document.getElementById("menu-open-google");
 
         let liveMarker = null;
-        let storeTargetMarker = null;
-        let deliveryTargetMarker = null;
+        let storeMarker = null;
+        let customerMarker = null;
         let routeLayer = null;
-        let hasInitializedView = false;
-        let isRefreshing = false;
-        let lastRenderedGpsId = 0;
-        let latestPayload = livePayload;
+        let activeStatusFilter = "all";
+        let searchQuery = "";
         let selectedOrderId = null;
         let selectedRouteMode = "store";
-
-        function setStatus(message) {
-            if (statusEl) {
-                statusEl.textContent = message;
-            }
-        }
+        let latestPayload = livePayload;
+        let isRefreshing = false;
+        let hasCenteredInitially = false;
 
         function openMenu() {
-            if (!menuDrawer || !menuToggle) {
-                return;
-            }
             document.body.classList.add("menu-open");
             menuDrawer.setAttribute("aria-hidden", "false");
             menuToggle.setAttribute("aria-expanded", "true");
         }
 
         function closeMenu() {
-            if (!menuDrawer || !menuToggle) {
-                return;
-            }
             document.body.classList.remove("menu-open");
             menuDrawer.setAttribute("aria-hidden", "true");
             menuToggle.setAttribute("aria-expanded", "false");
         }
 
-        function formatValue(value, fallback = "--") {
-            if (value === null || value === undefined || value === "") {
-                return fallback;
-            }
-            return String(value);
-        }
-
-        function formatCoordinatePair(current) {
-            if (!current || !Number.isFinite(Number(current.lat)) || !Number.isFinite(Number(current.lng))) {
-                return "--";
-            }
-            return `${Number(current.lat).toFixed(6)}, ${Number(current.lng).toFixed(6)}`;
-        }
-
-        function hasCoordinates(current) {
-            return !!current
-                && Number.isFinite(Number(current.lat))
-                && Number.isFinite(Number(current.lng));
-        }
-
-        function updateLinkState(linkEl, href) {
-            if (!linkEl) {
-                return;
-            }
-            if (href) {
-                linkEl.href = href;
-                linkEl.removeAttribute("aria-disabled");
-            } else {
-                linkEl.href = "#";
-                linkEl.setAttribute("aria-disabled", "true");
-            }
-        }
-
-        function setDetailValue(key, value, options = {}) {
-            const el = detailIds[key];
-            if (!el) {
-                return;
-            }
-            el.textContent = value;
-            el.classList.toggle("muted", !!options.muted);
-        }
-
-        function centerToLive() {
-            if (!liveMarker) {
-                setStatus("No live GPS position to center yet.");
-                return;
-            }
-            map.flyTo(liveMarker.getLatLng(), 17, { duration: 0.55 });
-            setStatus("Centered to the latest GPS position.");
-        }
-
-        function bindPopupContent(current) {
-            return `<strong>Your Delivery</strong>`;
+        function formatMoney(amount) {
+            const num = Number(amount || 0);
+            return `PHP ${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         }
 
         function escapeHtml(value) {
-            return String(value).replace(/[&<>"']/g, (char) => ({
+            return String(value || "").replace(/[&<>"']/g, (char) => ({
                 "&": "&amp;",
                 "<": "&lt;",
                 ">": "&gt;",
@@ -521,379 +719,214 @@ $initialStatus = $current
             }[char]));
         }
 
-        function formatMoney(value) {
-            const amount = Number(value);
-            return `PHP ${Number.isFinite(amount) ? amount.toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            }) : "0.00"}`;
-        }
-
-        function formatOrderStatus(status) {
-            return {
-                pending: "Pending",
-                for_pickup: "For Pickup",
-                delivering: "Delivering"
-            }[status] || status;
-        }
-
-        const deliveryAddressCache = new Map();
-
-        function formatCoordinateAddress(lat, lng) {
-            if (!Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) {
-                return "Address not available";
-            }
-            return `Pinned location: ${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}`;
-        }
-
-        function getDeliveryAddressKey(order) {
-            if (!order || !Number.isFinite(Number(order.delivery_lat)) || !Number.isFinite(Number(order.delivery_lng))) {
-                return "";
-            }
-            return `${Number(order.delivery_lat).toFixed(7)},${Number(order.delivery_lng).toFixed(7)}`;
-        }
-
-        function escapeSelectorValue(value) {
-            if (window.CSS && typeof window.CSS.escape === "function") {
-                return window.CSS.escape(value);
-            }
-            return String(value).replace(/["\\]/g, "\\$&");
-        }
-
-        function updateDeliveryAddressText(order) {
-            const key = getDeliveryAddressKey(order);
-            if (!key) {
-                return;
-            }
-
-            const elements = document.querySelectorAll(`[data-delivery-address-key="${escapeSelectorValue(key)}"]`);
-            if (!elements.length) {
-                return;
-            }
-
-            if (order.delivery_address && order.delivery_address !== "") {
-                deliveryAddressCache.set(key, order.delivery_address);
-                elements.forEach((element) => {
-                    element.textContent = order.delivery_address;
-                });
-                return;
-            }
-
-            const fallback = formatCoordinateAddress(order.delivery_lat, order.delivery_lng);
-            const cached = deliveryAddressCache.get(key);
-            if (cached) {
-                elements.forEach((element) => {
-                    element.textContent = cached;
-                });
-                return;
-            }
-
-            deliveryAddressCache.set(key, fallback);
-            elements.forEach((element) => {
-                element.textContent = fallback;
-            });
-
-            fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(order.delivery_lat)}&lon=${encodeURIComponent(order.delivery_lng)}&zoom=18&addressdetails=0`, {
-                cache: "force-cache"
-            })
-                .then((response) => response.ok ? response.json() : null)
-                .then((data) => {
-                    const resolvedAddress = data && data.display_name ? String(data.display_name) : "";
-                    if (!resolvedAddress) {
-                        return;
-                    }
-                    deliveryAddressCache.set(key, resolvedAddress);
-                    document.querySelectorAll(`[data-delivery-address-key="${escapeSelectorValue(key)}"]`).forEach((element) => {
-                        element.textContent = resolvedAddress;
-                    });
-                })
-                .catch(() => {
-                    deliveryAddressCache.set(key, fallback);
-                });
-        }
-
-        function getRouteTarget(order, mode = null) {
-            if (!order) {
-                return null;
-            }
-            const routeMode = mode || selectedRouteMode || (order.status === "delivering" ? "delivery" : "store");
-            if (routeMode === "store") {
-                return {
-                    mode: "pickup",
-                    label: "Route to store for pickup",
-                    popup: `Pickup: ${order.store_name || "Store"}`,
-                    lat: Number(order.store_lat),
-                    lng: Number(order.store_lng)
-                };
-            }
-            if (routeMode === "delivery") {
-                return {
-                    mode: "delivery",
-                    label: "Route to customer",
-                    popup: `Deliver to: ${order.customer_name || "Customer"}`,
-                    lat: Number(order.delivery_lat),
-                    lng: Number(order.delivery_lng)
-                };
-            }
-            return null;
-        }
-
         function clearRoute() {
             if (routeLayer) {
                 map.removeLayer(routeLayer);
                 routeLayer = null;
             }
-            if (storeTargetMarker) {
-                map.removeLayer(storeTargetMarker);
-                storeTargetMarker = null;
+            if (storeMarker) {
+                map.removeLayer(storeMarker);
+                storeMarker = null;
             }
-            if (deliveryTargetMarker) {
-                map.removeLayer(deliveryTargetMarker);
-                deliveryTargetMarker = null;
-            }
-        }
-
-        function buildGoogleMapsPointUrl(current) {
-            if (!hasCoordinates(current)) {
-                return "";
-            }
-            return `https://www.google.com/maps?q=${current.lat},${current.lng}`;
-        }
-
-        function buildGoogleMapsDirectionsUrl(current, target) {
-            if (!hasCoordinates(current) || !target || !Number.isFinite(target.lat) || !Number.isFinite(target.lng)) {
-                return "";
-            }
-
-            const origin = `${Number(current.lat).toFixed(6)},${Number(current.lng).toFixed(6)}`;
-            const destination = `${Number(target.lat).toFixed(6)},${Number(target.lng).toFixed(6)}`;
-            return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&travelmode=driving`;
-        }
-
-        function getSelectedRouteOrder(orders) {
-            const activeOrders = Array.isArray(orders)
-                ? orders.filter((order) => order.status !== "declined")
-                : [];
-            return activeOrders.find((order) => order.id === selectedOrderId) || activeOrders[0] || null;
-        }
-
-        function updateGoogleMapsLinks() {
-            const current = latestPayload.current || null;
-            const order = getSelectedRouteOrder(latestPayload.orders || []);
-            const target = order ? getRouteTarget(order, selectedRouteMode) : null;
-            const href = target
-                ? buildGoogleMapsDirectionsUrl(current, target)
-                : buildGoogleMapsPointUrl(current);
-
-            updateLinkState(menuOpenGoogle, href);
-            updateLinkState(panelOpenGoogle, href);
-            if (menuOpenGoogle) {
-                menuOpenGoogle.textContent = target ? "Open active route in Google Maps" : "Open in Google Maps";
-            }
-            if (panelOpenGoogle) {
-                panelOpenGoogle.textContent = target ? "Open active route in Google Maps" : "Open in Google Maps";
+            if (customerMarker) {
+                map.removeLayer(customerMarker);
+                customerMarker = null;
             }
         }
 
-        async function drawRouteForOrder(order, mode = null) {
-            const current = latestPayload.current || null;
-            const target = getRouteTarget(order, mode);
-            if (!hasCoordinates(current) || !target || !Number.isFinite(target.lat) || !Number.isFinite(target.lng)) {
+        async function drawRouteForOrder(order, mode = "store") {
+            const current = latestPayload.current;
+            if (!current || current.lat === null || current.lng === null || !order) {
                 clearRoute();
                 return;
             }
 
             const start = [Number(current.lat), Number(current.lng)];
-            const end = [target.lat, target.lng];
+            const isStore = mode === "store";
+            const targetLat = isStore ? Number(order.store_lat) : Number(order.delivery_lat);
+            const targetLng = isStore ? Number(order.store_lng) : Number(order.delivery_lng);
+
+            if (!Number.isFinite(targetLat) || !Number.isFinite(targetLng)) {
+                clearRoute();
+                return;
+            }
+
+            const end = [targetLat, targetLng];
             clearRoute();
 
-            if (target.mode === "pickup") {
-                storeTargetMarker = L.marker(end, { icon: driverIcon }).addTo(map).bindPopup(escapeHtml(target.popup || "Pickup store"));
+            if (isStore) {
+                storeMarker = L.marker(end, { icon: storeIcon }).addTo(map)
+                    .bindPopup(`<b>Pickup Store:</b><br>${escapeHtml(order.store_name)}`);
             } else {
-                deliveryTargetMarker = L.marker(end).addTo(map).bindPopup(escapeHtml(target.popup || "Customer delivery location"));
+                customerMarker = L.marker(end, { icon: customerIcon }).addTo(map)
+                    .bindPopup(`<b>Deliver to:</b><br>${escapeHtml(order.customer_name)}`);
             }
 
             try {
                 const url = `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson`;
                 const response = await fetch(url, { cache: "no-store" });
                 const data = await response.json();
-                const coordinates = data.routes && data.routes[0] && data.routes[0].geometry
-                    ? data.routes[0].geometry.coordinates.map((point) => [point[1], point[0]])
-                    : [start, end];
-                routeLayer = L.polyline(coordinates, {
-                    color: target.mode === "pickup" ? "#a80000" : "#1f8f5e",
+                const coords = (data?.routes?.[0]?.geometry?.coordinates || []).map((pt) => [pt[1], pt[0]]);
+                routeLayer = L.polyline(coords.length ? coords : [start, end], {
+                    color: isStore ? "#FF4D2E" : "#10B981",
                     weight: 5,
-                    opacity: 0.86
+                    opacity: 0.88
                 }).addTo(map);
+
                 map.fitBounds(routeLayer.getBounds(), {
-                    paddingTopLeft: [42, 90],
-                    paddingBottomRight: [42, 330]
+                    paddingTopLeft: [50, 420],
+                    paddingBottomRight: [50, 50]
                 });
-                setStatus(target.label);
-            } catch (error) {
+            } catch (e) {
                 routeLayer = L.polyline([start, end], {
-                    color: target.mode === "pickup" ? "#a80000" : "#1f8f5e",
+                    color: isStore ? "#FF4D2E" : "#10B981",
                     weight: 5,
-                    opacity: 0.75,
-                    dashArray: "8 8"
+                    dashArray: "8 8",
+                    opacity: 0.8
                 }).addTo(map);
+
                 map.fitBounds(routeLayer.getBounds(), {
-                    paddingTopLeft: [42, 90],
-                    paddingBottomRight: [42, 330]
+                    paddingTopLeft: [50, 420],
+                    paddingBottomRight: [50, 50]
                 });
-                setStatus(`${target.label}. Showing direct fallback line.`);
+            }
+
+            updateGoogleMapsLink(current, targetLat, targetLng);
+        }
+
+        function updateGoogleMapsLink(current, targetLat, targetLng) {
+            if (menuOpenGoogle) {
+                if (current && current.lat && targetLat) {
+                    menuOpenGoogle.href = `https://www.google.com/maps/dir/?api=1&origin=${current.lat},${current.lng}&destination=${targetLat},${targetLng}&travelmode=driving`;
+                    menuOpenGoogle.removeAttribute("aria-disabled");
+                } else if (current && current.lat) {
+                    menuOpenGoogle.href = `https://www.google.com/maps?q=${current.lat},${current.lng}`;
+                    menuOpenGoogle.removeAttribute("aria-disabled");
+                } else {
+                    menuOpenGoogle.href = "#";
+                    menuOpenGoogle.setAttribute("aria-disabled", "true");
+                }
             }
         }
 
         function renderOrders(orders) {
-            if (!ordersListEl || !ordersSummaryEl) {
+            if (!ordersListEl) return;
+            const list = Array.isArray(orders) ? orders : [];
+
+            let filtered = list;
+            if (activeStatusFilter !== "all") {
+                filtered = filtered.filter(o => o.status === activeStatusFilter);
+            }
+            if (searchQuery.trim() !== "") {
+                const q = searchQuery.toLowerCase();
+                filtered = filtered.filter(o =>
+                    String(o.id).includes(q) ||
+                    (o.customer_name || "").toLowerCase().includes(q) ||
+                    (o.store_name || "").toLowerCase().includes(q) ||
+                    (o.delivery_address || "").toLowerCase().includes(q)
+                );
+            }
+
+            if (!filtered.length) {
+                ordersListEl.innerHTML = `<div style="text-align:center; padding: 40px 20px; color:#64748B; font-size:14px;">No active orders found.</div>`;
                 return;
             }
 
-            if (!Array.isArray(orders) || !orders.length) {
-                ordersSummaryEl.textContent = "Waiting for customer checkout.";
-                ordersListEl.innerHTML = `<p class="driver-orders-empty">No active orders.</p>`;
-                selectedOrderId = null;
-                clearRoute();
-                updateGoogleMapsLinks();
-                return;
-            }
-
-            const activeOrders = orders.filter((order) => order.status !== "declined");
-            ordersSummaryEl.textContent = `${activeOrders.length} active order${activeOrders.length === 1 ? "" : "s"}.`;
-            ordersListEl.innerHTML = activeOrders.map((order) => {
+            ordersListEl.innerHTML = filtered.map(order => {
+                const isSelected = selectedOrderId === order.id;
                 const items = Array.isArray(order.items) ? order.items : [];
-                const itemLines = items.map((item) => (
-                    `<p>${escapeHtml(item.product_name)} x ${Number(item.quantity || 0)}</p>`
-                )).join("");
-                const pickupAddress = order.store_address && order.store_address !== ""
-                    ? order.store_address
-                    : formatCoordinateAddress(order.store_lat, order.store_lng);
-                const deliveryKey = getDeliveryAddressKey(order);
-                const deliveryAddress = order.delivery_address && order.delivery_address !== ""
-                    ? order.delivery_address
-                    : deliveryKey && deliveryAddressCache.has(deliveryKey)
-                    ? deliveryAddressCache.get(deliveryKey)
-                    : formatCoordinateAddress(order.delivery_lat, order.delivery_lng);
-                const routeAddressClass = order.status === "delivering" ? "active" : "";
-                const actions = order.status === "pending"
-                    ? `<button type="button" data-order-action="accept" data-order-id="${order.id}">Accept</button>
-                       <button type="button" data-order-action="decline" data-order-id="${order.id}">Decline</button>`
-                    : order.status === "for_pickup"
-                        ? `<button type="button" data-order-action="pickup" data-order-id="${order.id}">Picked up</button>`
-                        : `<button type="button" data-order-action="complete" data-order-id="${order.id}">Complete</button>`;
-                return `<article class="driver-order-card ${selectedOrderId === order.id ? "active" : ""}" data-order-id="${order.id}">
-                            <div class="driver-order-top">
-                                <div>
-                                    <strong>Order #${order.id}</strong>
-                                    <span>${escapeHtml(formatOrderStatus(order.status))}</span>
+                const itemSummary = items.map(it => `${escapeHtml(it.product_name)} × ${it.quantity}`).join(", ");
+                const pickupAddress = order.store_address || (order.store_lat ? `Lat ${Number(order.store_lat).toFixed(4)}, Lng ${Number(order.store_lng).toFixed(4)}` : "Store location");
+                const deliveryAddress = order.delivery_address || (order.delivery_lat ? `Lat ${Number(order.delivery_lat).toFixed(4)}, Lng ${Number(order.delivery_lng).toFixed(4)}` : "Customer location");
+
+                let actionHtml = "";
+                if (order.status === "pending") {
+                    actionHtml = `
+                        <button type="button" class="driver-btn btn-primary" data-action="accept" data-order-id="${order.id}">Accept</button>
+                        <button type="button" class="driver-btn btn-decline" data-action="decline" data-order-id="${order.id}">Decline</button>
+                    `;
+                } else if (order.status === "for_pickup") {
+                    actionHtml = `
+                        <button type="button" class="driver-btn" data-action="route-store" data-order-id="${order.id}">Route to store</button>
+                        <button type="button" class="driver-btn btn-primary" data-action="pickup" data-order-id="${order.id}">Picked up</button>
+                    `;
+                } else if (order.status === "delivering") {
+                    actionHtml = `
+                        <button type="button" class="driver-btn" data-action="route-delivery" data-order-id="${order.id}">Route to customer</button>
+                        <button type="button" class="driver-btn btn-success" data-action="complete" data-order-id="${order.id}">Complete</button>
+                    `;
+                }
+
+                return `
+                    <article class="driver-order-card ${isSelected ? 'active' : ''}" data-order-id="${order.id}">
+                        <div class="driver-card-header">
+                            <h3 class="driver-card-id">Order #${order.id}</h3>
+                            <span class="driver-status-badge status-${order.status}">${order.status.replace("_", " ")}</span>
+                        </div>
+
+                        <div class="driver-route-block">
+                            <div class="driver-route-row">
+                                <span class="driver-route-dot dot-store"></span>
+                                <div class="driver-route-text">
+                                    <span class="driver-route-label">Pickup</span>
+                                    <p class="driver-route-val">${escapeHtml(order.store_name)}</p>
+                                    <p class="driver-route-sub">${escapeHtml(pickupAddress)}</p>
                                 </div>
-                                <b>${escapeHtml(formatMoney(order.total_amount))}</b>
                             </div>
-                            <p class="driver-order-meta">Customer: ${escapeHtml(order.customer_name)}</p>
-                            <p class="driver-order-meta">Contact: ${escapeHtml(order.customer_contact || "No contact listed")}</p>
-                            <p class="driver-order-meta">Pickup: ${escapeHtml(order.store_name)}</p>
-                            <div class="driver-order-route-details">
-                                <p class="${order.status === "for_pickup" ? "active" : ""}">
-                                    <strong>Pickup address:</strong>
-                                    <span>${escapeHtml(pickupAddress)}</span>
-                                </p>
-                                <p class="${routeAddressClass}">
-                                    <strong>Delivery address:</strong>
-                                    <span data-delivery-address-key="${escapeHtml(deliveryKey)}">${escapeHtml(deliveryAddress)}</span>
-                                </p>
+                            <div class="driver-route-row">
+                                <span class="driver-route-dot dot-customer"></span>
+                                <div class="driver-route-text">
+                                    <span class="driver-route-label">Delivery</span>
+                                    <p class="driver-route-val">${escapeHtml(order.customer_name)}</p>
+                                    <p class="driver-route-sub">${escapeHtml(deliveryAddress)}</p>
+                                </div>
                             </div>
-                            <div class="driver-order-items">${itemLines || "<p>No items listed.</p>"}</div>
-                            <div class="driver-order-actions">
-                                <button type="button" data-order-action="route-store" data-order-id="${order.id}">Route to store</button>
-                                <button type="button" data-order-action="route-delivery" data-order-id="${order.id}">Delivery route</button>
-                                ${actions}
-                            </div>
-                        </article>`;
+                        </div>
+
+                        ${items.length ? `<div style="font-size:12.5px; color:#64748B;"><strong>Items:</strong> ${itemSummary}</div>` : ''}
+
+                        <div class="driver-order-amount">
+                            <span>Delivery fee: ${formatMoney(order.delivery_fee)}</span>
+                            <span class="driver-order-total">${formatMoney(order.total_amount)}</span>
+                        </div>
+
+                        <div class="driver-actions-grid">
+                            ${actionHtml}
+                        </div>
+                    </article>
+                `;
             }).join("");
 
-            const previousSelectedOrderId = selectedOrderId;
-            const selected = activeOrders.find((order) => order.id === selectedOrderId)
-                || activeOrders.find((order) => order.status === "for_pickup" || order.status === "delivering");
-            if (selected) {
-                if (previousSelectedOrderId !== selected.id) {
-                    selectedRouteMode = selected.status === "delivering" ? "delivery" : "store";
+            if (!selectedOrderId) {
+                const first = list.find(o => o.status === "for_pickup" || o.status === "delivering");
+                if (first) {
+                    selectedOrderId = first.id;
+                    selectedRouteMode = first.status === "delivering" ? "delivery" : "store";
+                    drawRouteForOrder(first, selectedRouteMode);
                 }
-                selectedOrderId = selected.id;
-                drawRouteForOrder(selected, selectedRouteMode);
             }
-            activeOrders.forEach(updateDeliveryAddressText);
-            updateGoogleMapsLinks();
         }
 
-        function renderLiveData(payload, options = {}) {
+        function renderLiveData(payload, forceCenter = false) {
             latestPayload = payload;
-            const current = payload.current || null;
-            const history = Array.isArray(payload.history) ? payload.history : [];
-            updateGoogleMapsLinks();
+            const current = payload.current;
 
-            drawerFeedStatus.textContent = current
-                ? `Receiving GPS updates from ${payload.source || "gps_logs"}.`
-                : "No GPS rows with coordinates yet.";
-            drawerDevice.textContent = `Device: ${formatValue(current && current.device)}`;
-            drawerStatus.textContent = `Status: ${formatValue(current && current.status)}`;
-            drawerDeviceTime.textContent = `Device time: ${formatValue(current && current.device_time)}`;
-            drawerServerTime.textContent = `Server time: ${formatValue(current && current.created_at)}`;
+            if (current && current.lat !== null && current.lng !== null) {
+                hudStatusText.textContent = `GPS Connected (${current.device || "Unit"})`;
+                liveIndicatorDot.style.background = "#10B981";
 
-            setDetailValue("device", formatValue(current && current.device), { muted: !current });
-            setDetailValue("status", formatValue(current && current.status), { muted: !current });
-            setDetailValue("coordinates", formatCoordinatePair(current), { muted: !hasCoordinates(current) });
-            setDetailValue("sat", formatValue(current && current.sat), { muted: !current });
-            setDetailValue("hdop", formatValue(current && current.hdop), { muted: !current });
-            setDetailValue("valid", formatValue(current && current.valid), { muted: !current });
-            setDetailValue("device_time", formatValue(current && current.device_time), { muted: !current });
-            setDetailValue("created_at", formatValue(current && current.created_at), { muted: !current });
-            setDetailValue("chars_count", formatValue(current && current.chars_count), { muted: !current });
-            setDetailValue("updated", formatValue(current && current.updated), { muted: !current });
-
-            if (!current) {
-                if (panelNote) {
-                    panelNote.textContent = "The dashboard will update automatically once gps_logs receives coordinates.";
-                }
-                livePillText.textContent = "Waiting for GPS logs";
-                liveDot.classList.add("is-stale");
-                lastRenderedGpsId = 0;
-                setStatus("Waiting for GPS logs with latitude and longitude.");
-                return;
-            }
-
-            if (panelNote) {
-                panelNote.textContent = `Latest GPS row ID ${current.id} loaded from gps_logs.`;
-            }
-            livePillText.textContent = `Last server update: ${formatValue(current.created_at)}`;
-            liveDot.classList.remove("is-stale");
-
-            if (hasCoordinates(current)) {
-                const liveLatLng = [Number(current.lat), Number(current.lng)];
-                const hasNewGpsRow = Number(current.id || 0) !== lastRenderedGpsId;
-
+                const latLng = [Number(current.lat), Number(current.lng)];
                 if (liveMarker) {
-                    liveMarker.setLatLng(liveLatLng);
-                    liveMarker.setPopupContent(bindPopupContent(current));
+                    liveMarker.setLatLng(latLng);
                 } else {
-                    liveMarker = L.marker(liveLatLng, { icon: driverIcon }).addTo(map);
-                    liveMarker.bindPopup(bindPopupContent(current));
+                    liveMarker = L.marker(latLng, { icon: driverIcon }).addTo(map)
+                        .bindPopup("<strong>Your Location</strong>");
                 }
 
-                if (!hasInitializedView || options.forceCenter || hasNewGpsRow) {
-                    if (!hasInitializedView) {
-                        map.setView(liveLatLng, 16);
-                    } else {
-                        map.flyTo(liveLatLng, Math.max(map.getZoom(), 16), { duration: 0.55 });
-                    }
-                    hasInitializedView = true;
+                if (!hasCenteredInitially || forceCenter) {
+                    map.setView(latLng, 15);
+                    hasCenteredInitially = true;
                 }
-
-                lastRenderedGpsId = Number(current.id || 0);
-                setStatus(`Live GPS ready for ${formatValue(current.device)} at ${formatCoordinatePair(current)}.`);
-            } else {
-                lastRenderedGpsId = Number(current.id || 0);
-                setStatus("Latest GPS row does not include coordinates.");
             }
 
             renderOrders(payload.orders || []);
@@ -901,138 +934,140 @@ $initialStatus = $current
 
         async function submitOrderAction(orderId, action) {
             try {
-                const response = await fetch("driver_dashboard.php", {
+                const res = await fetch("driver_dashboard.php", {
                     method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
+                    headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ order_id: orderId, action })
                 });
-                const result = await response.json();
-                if (!response.ok || !result.ok) {
-                    throw new Error(result.message || "Unable to update order.");
+                const data = await res.json();
+                if (!res.ok || !data.ok) {
+                    alert(data.message || "Failed to update order");
+                    return;
                 }
                 if (action === "complete") {
                     selectedOrderId = null;
-                    selectedRouteMode = "store";
                     clearRoute();
-                    setStatus("Delivery completed.");
-                    window.alert("Thank you for Delivery");
+                    alert("Thank you for the delivery!");
                     window.location.reload();
                     return;
                 }
-                renderLiveData(result.payload || latestPayload, { forceCenter: false });
-                setStatus(result.message || "Order updated.");
-            } catch (error) {
-                setStatus(error.message || "Unable to update order.");
+                renderLiveData(data.payload || latestPayload);
+            } catch (err) {
+                alert("Network error updating order.");
             }
         }
 
-        async function refreshLiveData(forceCenter = false) {
-            if (isRefreshing) {
-                return;
-            }
-
+        async function fetchFreshData(forceCenter = false) {
+            if (isRefreshing) return;
             isRefreshing = true;
             try {
-                const response = await fetch(`driver_dashboard.php?format=json&_=${Date.now()}`, {
-                    cache: "no-store"
-                });
-
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-
-                const payload = await response.json();
-                renderLiveData(payload, { forceCenter });
-            } catch (error) {
-                liveDot.classList.add("is-stale");
-                livePillText.textContent = "Refresh failed. Retrying.";
-                setStatus("Unable to fetch the latest GPS data. Retrying in 10 seconds.");
+                const res = await fetch(`driver_dashboard.php?format=json&_=${Date.now()}`, { cache: "no-store" });
+                if (!res.ok) throw new Error("HTTP error");
+                const data = await res.json();
+                renderLiveData(data, forceCenter);
+            } catch (e) {
+                // Network / GPS retry
             } finally {
                 isRefreshing = false;
             }
         }
 
+        // Event Bindings
         if (menuToggle && menuClose && menuBackdrop) {
             menuToggle.addEventListener("click", openMenu);
             menuClose.addEventListener("click", closeMenu);
             menuBackdrop.addEventListener("click", closeMenu);
         }
 
-        if (driverPanel && driverPanelBody && driverPanelToggle) {
-            driverPanelToggle.addEventListener("click", () => {
-                const isMinimized = driverPanel.classList.toggle("is-minimized");
-                driverPanelBody.hidden = isMinimized;
-                driverPanelToggle.textContent = isMinimized ? "Show panel" : "Minimize";
-                driverPanelToggle.setAttribute("aria-expanded", String(!isMinimized));
-                window.setTimeout(() => {
-                    map.invalidateSize();
-                }, 220);
+        if (sidebarCollapseBtn && sidebarExpandBtn) {
+            sidebarCollapseBtn.addEventListener("click", () => {
+                document.body.classList.add("sidebar-collapsed");
+                sidebarExpandBtn.hidden = false;
+                setTimeout(() => map.invalidateSize(), 360);
+            });
+            sidebarExpandBtn.addEventListener("click", () => {
+                document.body.classList.remove("sidebar-collapsed");
+                sidebarExpandBtn.hidden = true;
+                setTimeout(() => map.invalidateSize(), 360);
             });
         }
 
-        document.addEventListener("keydown", (event) => {
-            if (event.key === "Escape") {
-                closeMenu();
+        document.getElementById("map-recenter-btn").addEventListener("click", () => {
+            if (liveMarker) {
+                map.flyTo(liveMarker.getLatLng(), 16, { duration: 0.5 });
             }
         });
 
-        [
-            document.getElementById("menu-center-live"),
-            document.getElementById("panel-center-live")
-        ].forEach((button) => {
-            if (button) {
-                button.addEventListener("click", () => {
-                    centerToLive();
-                    closeMenu();
-                });
-            }
+        document.getElementById("menu-center-live")?.addEventListener("click", () => {
+            if (liveMarker) map.flyTo(liveMarker.getLatLng(), 16);
+            closeMenu();
         });
 
-        [
-            document.getElementById("menu-refresh-now"),
-            document.getElementById("panel-refresh-now"),
-            document.getElementById("orders-refresh-now")
-        ].forEach((button) => {
-            if (button) {
-                button.addEventListener("click", () => {
-                    refreshLiveData(false);
-                    closeMenu();
-                });
-            }
+        document.getElementById("menu-refresh-now")?.addEventListener("click", () => {
+            fetchFreshData(false);
+            closeMenu();
         });
 
-        if (ordersListEl) {
-            ordersListEl.addEventListener("click", (event) => {
-                const button = event.target.closest("[data-order-action]");
-                if (!button) {
-                    return;
-                }
+        document.getElementById("driver-refresh-btn")?.addEventListener("click", () => {
+            fetchFreshData(false);
+        });
 
-                const orderId = Number(button.dataset.orderId || 0);
-                const action = button.dataset.orderAction || "";
-                const order = (latestPayload.orders || []).find((item) => Number(item.id) === orderId);
-                if (!order) {
-                    return;
-                }
+        document.querySelectorAll("#status-filter-pills .cat-pill").forEach(pill => {
+            pill.addEventListener("click", () => {
+                document.querySelectorAll("#status-filter-pills .cat-pill").forEach(p => p.classList.remove("active"));
+                pill.classList.add("active");
+                activeStatusFilter = pill.dataset.status;
+                renderOrders(latestPayload.orders || []);
+            });
+        });
 
-                selectedOrderId = orderId;
+        searchInput?.addEventListener("input", (e) => {
+            searchQuery = e.target.value;
+            renderOrders(latestPayload.orders || []);
+        });
+
+        ordersListEl?.addEventListener("click", (e) => {
+            const btn = e.target.closest("[data-action]");
+            if (btn) {
+                const action = btn.dataset.action;
+                const orderId = Number(btn.dataset.orderId);
+                const order = (latestPayload.orders || []).find(o => o.id === orderId);
+
                 if (action === "route-store" || action === "route-delivery") {
+                    selectedOrderId = orderId;
                     selectedRouteMode = action === "route-delivery" ? "delivery" : "store";
                     drawRouteForOrder(order, selectedRouteMode);
                     renderOrders(latestPayload.orders || []);
-                    updateGoogleMapsLinks();
+                    return;
+                }
+
+                if (action === "complete") {
+                    if (confirm(`Mark Order #${orderId} as Delivered?`)) {
+                        submitOrderAction(orderId, action);
+                    }
                     return;
                 }
 
                 submitOrderAction(orderId, action);
-            });
-        }
+                return;
+            }
 
-        renderLiveData(livePayload, { forceCenter: false });
-        window.setInterval(() => {
-            refreshLiveData(false);
+            const card = e.target.closest(".driver-order-card");
+            if (card) {
+                const orderId = Number(card.dataset.orderId);
+                const order = (latestPayload.orders || []).find(o => o.id === orderId);
+                if (order) {
+                    selectedOrderId = orderId;
+                    selectedRouteMode = order.status === "delivering" ? "delivery" : "store";
+                    drawRouteForOrder(order, selectedRouteMode);
+                    renderOrders(latestPayload.orders || []);
+                }
+            }
+        });
+
+        renderLiveData(livePayload, true);
+        setInterval(() => {
+            fetchFreshData(false);
         }, refreshIntervalMs);
     </script>
 </body>
