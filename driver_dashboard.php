@@ -68,16 +68,15 @@ function fetch_driver_orders(mysqli $mysqli): array
          LEFT JOIN users su ON su.id = o.store_user_id
          WHERE o.order_type = 'delivery'
            AND (
-             o.status IN ('pending', 'for_pickup', 'delivering')
+             o.status IN ('pending', 'delivering')
              OR (o.status = 'completed' AND DATE(o.delivered_at) = CURRENT_DATE())
            )
          ORDER BY 
            CASE o.status
              WHEN 'delivering' THEN 1
-             WHEN 'for_pickup' THEN 2
-             WHEN 'pending' THEN 3
-             WHEN 'completed' THEN 4
-             ELSE 5
+             WHEN 'pending' THEN 2
+             WHEN 'completed' THEN 3
+             ELSE 4
            END,
            o.created_at DESC
          LIMIT 30"
@@ -214,9 +213,8 @@ function build_live_payload(mysqli $mysqli): array
 function update_order_status(mysqli $mysqli, int $orderId, string $action): array
 {
     $transitions = [
-        "accept" => ["from" => "pending", "to" => "for_pickup", "time_column" => "accepted_at"],
+        "accept" => ["from" => "pending", "to" => "delivering", "time_column" => "accepted_at"],
         "decline" => ["from" => "pending", "to" => "declined", "time_column" => "declined_at"],
-        "pickup" => ["from" => "for_pickup", "to" => "delivering", "time_column" => "pickup_at"],
         "complete" => ["from" => "delivering", "to" => "completed", "time_column" => "delivered_at"],
     ];
 
@@ -226,17 +224,33 @@ function update_order_status(mysqli $mysqli, int $orderId, string $action): arra
 
     $transition = $transitions[$action];
     $timeColumn = $transition["time_column"];
-    $stmt = $mysqli->prepare(
-        "UPDATE orders
-         SET status = ?, {$timeColumn} = CURRENT_TIMESTAMP
-         WHERE id = ? AND status = ?
-         LIMIT 1"
-    );
+
+    if ($action === "accept") {
+        $stmt = $mysqli->prepare(
+            "UPDATE orders
+             SET status = 'delivering', accepted_at = CURRENT_TIMESTAMP, pickup_at = CURRENT_TIMESTAMP
+             WHERE id = ? AND status = 'pending'
+             LIMIT 1"
+        );
+    } else {
+        $stmt = $mysqli->prepare(
+            "UPDATE orders
+             SET status = ?, {$timeColumn} = CURRENT_TIMESTAMP
+             WHERE id = ? AND status = ?
+             LIMIT 1"
+        );
+    }
+
     if (!$stmt) {
         return ["ok" => false, "message" => "Unable to update order."];
     }
 
-    $stmt->bind_param("sis", $transition["to"], $orderId, $transition["from"]);
+    if ($action === "accept") {
+        $stmt->bind_param("i", $orderId);
+    } else {
+        $stmt->bind_param("sis", $transition["to"], $orderId, $transition["from"]);
+    }
+
     $stmt->execute();
     $updated = $stmt->affected_rows > 0;
     $stmt->close();
@@ -838,7 +852,6 @@ $earnings = fetch_driver_earnings($conn);
                 <div class="sidebar-categories" id="status-filter-pills">
                     <button type="button" class="cat-pill active" data-status="all">All</button>
                     <button type="button" class="cat-pill" data-status="pending">Pending</button>
-                    <button type="button" class="cat-pill" data-status="for_pickup">For Pickup</button>
                     <button type="button" class="cat-pill" data-status="delivering">Delivering</button>
                     <button type="button" class="cat-pill" data-status="completed">Completed</button>
                 </div>
@@ -1276,11 +1289,6 @@ $earnings = fetch_driver_earnings($conn);
                         <button type="button" class="driver-btn btn-primary" data-action="accept" data-order-id="${order.id}">Accept</button>
                         <button type="button" class="driver-btn btn-decline" data-action="decline" data-order-id="${order.id}">Decline</button>
                     `;
-                } else if (order.status === "for_pickup") {
-                    actionHtml = `
-                        <button type="button" class="driver-btn" data-action="route-store" data-order-id="${order.id}">Route to store</button>
-                        <button type="button" class="driver-btn btn-primary" data-action="pickup" data-order-id="${order.id}">Picked up</button>
-                    `;
                 } else if (order.status === "delivering") {
                     actionHtml = `
                         <button type="button" class="driver-btn" data-action="route-delivery" data-order-id="${order.id}">Route to customer</button>
@@ -1329,10 +1337,10 @@ $earnings = fetch_driver_earnings($conn);
             }).join("");
 
             if (!selectedOrderId) {
-                const first = list.find(o => o.status === "for_pickup" || o.status === "delivering");
+                const first = list.find(o => o.status === "delivering");
                 if (first) {
                     selectedOrderId = first.id;
-                    selectedRouteMode = first.status === "delivering" ? "delivery" : "store";
+                    selectedRouteMode = "delivery";
                     drawRouteForOrder(first, selectedRouteMode);
                 }
             }

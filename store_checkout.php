@@ -116,16 +116,25 @@ if ($userStmt) {
 
                 <div class="checkout-choice">
                     <label>
-                        <input type="radio" name="checkout_type" value="delivery" checked>
+                        <input type="radio" name="checkout_type" value="delivery" <?php echo (($_GET["order_type"] ?? "delivery") !== "pickup") ? "checked" : ""; ?>>
                         <span>Delivery</span>
                     </label>
                     <label>
-                        <input type="radio" name="checkout_type" value="pickup">
+                        <input type="radio" name="checkout_type" value="pickup" <?php echo (($_GET["order_type"] ?? "") === "pickup") ? "checked" : ""; ?>>
                         <span>Pickup</span>
                     </label>
                 </div>
 
-                <div class="checkout-address">
+                <div class="cart-time-section" style="margin-top:2px;">
+                    <div class="cart-time-header">
+                        <span id="checkout-time-title"><?php echo (($_GET["order_type"] ?? "") === "pickup") ? "Pickup Time" : "Delivery Time"; ?></span>
+                    </div>
+                    <select id="checkout-time-select" class="cart-time-select">
+                        <option value="ASAP" selected>ASAP (Estimated 20-35 mins)</option>
+                    </select>
+                </div>
+
+                <div class="checkout-address" id="checkout-address-block">
                     <span>Delivery address</span>
                     <strong><?php echo escape($user["address"] !== "" ? $user["address"] : "No saved delivery address"); ?></strong>
                 </div>
@@ -159,7 +168,10 @@ if ($userStmt) {
         const checkoutTotal = document.getElementById("checkout-total");
         const checkoutStatus = document.getElementById("checkout-status");
         const placeOrderButton = document.getElementById("place-order");
-        let checkoutType = "delivery";
+        const checkoutTimeSelect = document.getElementById("checkout-time-select");
+        const checkoutTimeTitle = document.getElementById("checkout-time-title");
+        const checkoutAddressBlock = document.getElementById("checkout-address-block");
+        let checkoutType = document.querySelector("input[name='checkout_type']:checked")?.value || "delivery";
         const deliveryFee = 40;
 
         function escapeHtml(value) {
@@ -222,6 +234,15 @@ if ($userStmt) {
         function renderCheckout() {
             const items = loadCart();
             const itemCount = items.reduce((total, item) => total + normalizeQuantity(item.quantity, 0), 0);
+
+            if (checkoutAddressBlock) {
+                checkoutAddressBlock.style.display = checkoutType === "pickup" ? "none" : "grid";
+            }
+
+            if (checkoutTimeTitle) {
+                checkoutTimeTitle.textContent = checkoutType === "pickup" ? "Pickup Time" : "Delivery Time";
+            }
+
             if (!items.length) {
                 checkoutItems.innerHTML = `<p class="public-cart-empty">Your cart is empty.</p>`;
                 checkoutSummary.textContent = "Add products from the store before checkout.";
@@ -239,17 +260,17 @@ if ($userStmt) {
                 const price = Number(item.price);
                 const lineTotal = Number.isFinite(price) ? price * quantity : Number.NaN;
                 return `<p>
-                            <span>${escapeHtml(item.name || "Product")} x ${quantity}</span>
+                            <span>${escapeHtml(item.name || "Product")} × ${quantity}</span>
                             <strong>${escapeHtml(formatCartPrice(lineTotal))}</strong>
                         </p>`;
             }).join("")}
                 <p>
-                    <span>Delivery Fee</span>
-                    <strong>${escapeHtml(formatCartPrice(checkoutType === "delivery" ? deliveryFee : 0))}</strong>
+                    <span>${checkoutType === "pickup" ? "Pickup Fee" : "Delivery Fee"}</span>
+                    <strong style="${checkoutType === "pickup" ? "color:#10B981;" : ""}">${checkoutType === "pickup" ? "PHP 0.00" : escapeHtml(formatCartPrice(deliveryFee))}</strong>
                 </p>
-                <p class="grand-total-line">
+                <p class="grand-total-line" style="font-weight:800; border-top:1px dashed #CBD5E1; padding-top:6px; margin-top:4px;">
                     <span>Grand total</span>
-                    <strong>${escapeHtml(formatCartPrice(getCheckoutTotal(items)))}</strong>
+                    <strong style="color:#FF5B2E; font-size:16px;">${escapeHtml(formatCartPrice(getCheckoutTotal(items)))}</strong>
                 </p>`;
             checkoutItems.innerHTML = items.map((item) => {
                 const quantity = normalizeQuantity(item.quantity);
@@ -266,6 +287,74 @@ if ($userStmt) {
                             </div>
                         </article>`;
             }).join("");
+        }
+
+        // ── Smart Time Slot Generator (Current Time Aware, No Emojis) ──
+        function generateSmartTimeSlots(selectedVal = "ASAP") {
+            const slots = [];
+            slots.push({ value: "ASAP", text: "ASAP (Estimated 20-35 mins)" });
+
+            const now = new Date();
+            // Start 30 minutes from now
+            const start = new Date(now.getTime() + 30 * 60 * 1000);
+            
+            // Round up to the next 30-minute boundary
+            const mins = start.getMinutes();
+            if (mins > 0 && mins <= 30) {
+                start.setMinutes(30, 0, 0);
+            } else if (mins > 30) {
+                start.setHours(start.getHours() + 1, 0, 0, 0);
+            }
+
+            function formatTime(d) {
+                let hours = d.getHours();
+                const ampm = hours >= 12 ? "PM" : "AM";
+                hours = hours % 12;
+                if (hours === 0) hours = 12;
+                const m = d.getMinutes().toString().padStart(2, "0");
+                return `${hours}:${m} ${ampm}`;
+            }
+
+            // Generate slots for Today up to 10:00 PM (hour 22)
+            let current = new Date(start.getTime());
+            const endToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 22, 0, 0);
+
+            while (current < endToday) {
+                const slotEnd = new Date(current.getTime() + 30 * 60 * 1000);
+                const label = `Today, ${formatTime(current)} - ${formatTime(slotEnd)}`;
+                slots.push({ value: label, text: label });
+                current = new Date(current.getTime() + 30 * 60 * 1000);
+            }
+
+            // Add Tomorrow slots from 9:00 AM to 9:00 PM
+            const tmrw = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 9, 0, 0);
+            const endTmrw = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 21, 0, 0);
+            let tmrwCurrent = new Date(tmrw.getTime());
+
+            while (tmrwCurrent < endTmrw) {
+                const slotEnd = new Date(tmrwCurrent.getTime() + 60 * 60 * 1000);
+                const label = `Tomorrow, ${formatTime(tmrwCurrent)} - ${formatTime(slotEnd)}`;
+                slots.push({ value: label, text: label });
+                tmrwCurrent = new Date(tmrwCurrent.getTime() + 60 * 60 * 1000);
+            }
+
+            return slots;
+        }
+
+        function populateTimeSelect(selectEl, selectedVal = "ASAP") {
+            if (!selectEl) return;
+            const currentSelected = selectedVal || selectEl.value || "ASAP";
+            const slots = generateSmartTimeSlots(currentSelected);
+            selectEl.innerHTML = "";
+            slots.forEach(slot => {
+                const opt = document.createElement("option");
+                opt.value = slot.value;
+                opt.textContent = slot.text;
+                if (slot.value === currentSelected) {
+                    opt.selected = true;
+                }
+                selectEl.appendChild(opt);
+            });
         }
 
         async function getCurrentLocation() {
@@ -294,6 +383,8 @@ if ($userStmt) {
             placeOrderButton.textContent = checkoutType === "delivery" ? "Locating..." : "Placing...";
             checkoutStatus.textContent = checkoutType === "delivery" ? "Getting delivery location..." : "Placing pickup order...";
 
+            const selectedTime = checkoutTimeSelect ? checkoutTimeSelect.value : "ASAP";
+
             try {
                 const hasSavedPin = Number.isFinite(Number(userHomePin.lat)) && Number.isFinite(Number(userHomePin.lng));
                 const location = checkoutType === "delivery" && !hasSavedPin
@@ -306,6 +397,7 @@ if ($userStmt) {
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         order_type: checkoutType,
+                        scheduled_time: selectedTime,
                         delivery_lat: checkoutType === "delivery" ? location.lat : null,
                         delivery_lng: checkoutType === "delivery" ? location.lng : null,
                         items: items.map((item) => ({
@@ -323,6 +415,11 @@ if ($userStmt) {
                 renderCheckout();
                 checkoutStatus.textContent = result.message || "Order placed.";
                 placeOrderButton.textContent = "Order placed";
+
+                // Redirect to order history after 1.5s
+                setTimeout(() => {
+                    window.location.href = "order_history.php";
+                }, 1500);
             } catch (error) {
                 checkoutStatus.textContent = error.message || "Checkout failed. Please try again.";
                 placeOrderButton.disabled = false;
@@ -340,6 +437,10 @@ if ($userStmt) {
         if (placeOrderButton) {
             placeOrderButton.addEventListener("click", placeOrder);
         }
+
+        // Initialize dynamic time slots on page load
+        const initialScheduledTime = <?php echo json_encode($_GET["scheduled_time"] ?? "ASAP"); ?>;
+        populateTimeSelect(checkoutTimeSelect, initialScheduledTime);
 
         renderCheckout();
     </script>

@@ -664,6 +664,72 @@ if ($cat_res) {
             overflow: hidden;
             background: #F8FAFC;
             box-shadow: inset 0 2px 4px rgba(15, 23, 42, 0.03);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .reg-map-frame #reg-map,
+        .reg-map-frame #user-map,
+        .reg-map-frame #store-map,
+        .reg-map-frame .leaflet-container {
+            width: 100% !important;
+            height: 100% !important;
+            min-height: 100% !important;
+            flex: 1 !important;
+            border-radius: 0 !important;
+        }
+
+        /* ── Map Pin Markers (Synced with home.php) ── */
+        .custom-marker {
+            background: transparent;
+            border: none;
+        }
+
+        .map-marker {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: 3px solid #FFFFFF;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #FFFFFF;
+            background: var(--primary, #FF4D2E);
+            box-shadow: 0 8px 20px rgba(255, 77, 46, 0.4);
+            transition: transform 0.2s ease;
+        }
+
+        .map-marker:hover {
+            transform: scale(1.12);
+        }
+
+        .map-marker.store {
+            background: #10B981;
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.45);
+        }
+
+        .map-marker.user,
+        .map-marker.customer {
+            background: #FF4D2E;
+            box-shadow: 0 8px 20px rgba(255, 77, 46, 0.45);
+        }
+
+        .map-marker.rider {
+            background: #FFFFFF;
+            color: #FF4D2E;
+            border-color: #FF4D2E;
+            box-shadow: 0 0 0 3px rgba(255, 77, 46, 0.15), 0 8px 20px rgba(0, 0, 0, 0.25);
+        }
+
+        .marker-svg {
+            width: 18px;
+            height: 18px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2.2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
         }
 
         .reg-map-footer {
@@ -886,17 +952,17 @@ if ($cat_res) {
                     <div class="reg-role-nav" role="radiogroup" aria-label="Account type">
                         <label class="reg-role-tab" id="tab-user">
                             <input type="radio" name="account_type" value="user" <?php echo $values["account_type"] === "user" ? "checked" : ""; ?> required>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M5 21a7 7 0 0 1 14 0"/></svg>
                             <span>Customer</span>
                         </label>
                         <label class="reg-role-tab" id="tab-store">
                             <input type="radio" name="account_type" value="store" <?php echo $values["account_type"] === "store" ? "checked" : ""; ?> required>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l2-5h14l2 5"/><path d="M5 9v11h14V9"/><path d="M9 20v-5h6v5"/></svg>
                             <span>Store Owner</span>
                         </label>
                         <label class="reg-role-tab" id="tab-driver">
                             <input type="radio" name="account_type" value="driver" <?php echo $values["account_type"] === "driver" ? "checked" : ""; ?> required>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/></svg>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/><path d="M9 7H6"/><path d="M8.5 10.5 11 17.5"/><path d="M11 10.5h4l2.5 7"/><path d="M10.5 10.5 14 7.5"/></svg>
                             <span>Rider</span>
                         </label>
                     </div>
@@ -974,8 +1040,18 @@ if ($cat_res) {
                                 </div>
                             </div>
                             <div class="reg-field">
-                                <label for="store_address">Store Address</label>
-                                <input type="text" id="store_address" name="store_address" value="<?php echo escape($values["store_address"]); ?>" placeholder="Street, city, province">
+                                <label for="store_address">
+                                    <span>Store Address</span>
+                                    <button type="button" class="inline-loc-btn" id="use-current-location-store-btn">
+                                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+                                        <span>GPS</span>
+                                    </button>
+                                </label>
+                                <div class="address-autofill-wrap">
+                                    <input type="text" id="store_address" name="store_address" value="<?php echo escape($values["store_address"]); ?>" placeholder="Type store address or street..." autocomplete="off">
+                                    <div class="address-autofill-spinner" id="store-addr-spinner"></div>
+                                    <div class="address-suggestions" id="store-addr-suggestions" role="listbox" aria-label="Store address suggestions"></div>
+                                </div>
                                 <input type="hidden" id="store_lat" name="store_lat" value="<?php echo escape($values["store_lat"]); ?>">
                                 <input type="hidden" id="store_lng" name="store_lng" value="<?php echo escape($values["store_lng"]); ?>">
                             </div>
@@ -1051,8 +1127,7 @@ if ($cat_res) {
                     </div>
 
                     <div class="reg-map-frame">
-                        <div id="user-map" style="width:100%; height:100%;"></div>
-                        <div id="store-map" style="width:100%; height:100%; display:none;"></div>
+                        <div id="reg-map" style="width:100%; height:100%;"></div>
                     </div>
 
                     <div class="reg-map-footer">
@@ -1077,7 +1152,9 @@ if ($cat_res) {
                     </div>
 
                     <div class="driver-perk-item">
-                        <div class="driver-perk-icon">⚡</div>
+                        <div class="driver-perk-icon">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                        </div>
                         <div>
                             <strong style="color:#0F172A; display:block; font-size:12.5px; margin-bottom:2px;">Instant Order Routing</strong>
                             Receive delivery requests within your neighborhood automatically with real-time turn directions.
@@ -1085,7 +1162,9 @@ if ($cat_res) {
                     </div>
 
                     <div class="driver-perk-item">
-                        <div class="driver-perk-icon">💰</div>
+                        <div class="driver-perk-icon">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                        </div>
                         <div>
                             <strong style="color:#0F172A; display:block; font-size:12.5px; margin-bottom:2px;">Daily Payouts</strong>
                             Keep 100% of tips and earn competitive rates per completed delivery run.
@@ -1093,7 +1172,9 @@ if ($cat_res) {
                     </div>
 
                     <div class="driver-perk-item">
-                        <div class="driver-perk-icon">🛡️</div>
+                        <div class="driver-perk-icon">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+                        </div>
                         <div>
                             <strong style="color:#0F172A; display:block; font-size:12.5px; margin-bottom:2px;">Fast Verification</strong>
                             Upload clear photos of your Government ID and OR/CR for 24-hour express account activation.
@@ -1127,13 +1208,8 @@ if ($cat_res) {
         const userLatInput = document.getElementById("user_lat");
         const userLngInput = document.getElementById("user_lng");
         
-        const userMapEl = document.getElementById("user-map");
-        const storeMapEl = document.getElementById("store-map");
-
-        let storeMap = null;
-        let storeMarker = null;
-        let userMap = null;
-        let userMarker = null;
+        let regMap = null;
+        let regMarker = null;
 
         function setStatus(msg) {
             if (mapStatusText) {
@@ -1153,32 +1229,51 @@ if ($cat_res) {
             }
         }
 
-        function setStoreMarker(latlng) {
-            if (!storeMap) return;
-            if (storeMarker) {
-                storeMarker.setLatLng(latlng);
-            } else {
-                storeMarker = L.marker(latlng).addTo(storeMap);
-            }
-            storeLatInput.value = latlng.lat.toFixed(6);
-            storeLngInput.value = latlng.lng.toFixed(6);
-            setStatus(`Pinned: ${storeLatInput.value}, ${storeLngInput.value}`);
+        const storeIcon = L.divIcon({
+            className: "custom-marker",
+            html: `<div class="map-marker store">
+                    <svg class="marker-svg" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M3 9l2-5h14l2 5"></path>
+                        <path d="M5 9v11h14V9"></path>
+                        <path d="M9 20v-5h6v5"></path>
+                    </svg>
+                </div>`,
+            iconSize: [36, 36],
+            iconAnchor: [18, 36],
+            popupAnchor: [0, -32]
+        });
+
+        const customerIcon = L.divIcon({
+            className: "custom-marker",
+            html: `<div class="map-marker user">
+                    <svg class="marker-svg" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="12" cy="8" r="4"></circle>
+                        <path d="M5 21a7 7 0 0 1 14 0"></path>
+                    </svg>
+                </div>`,
+            iconSize: [36, 36],
+            iconAnchor: [18, 36],
+            popupAnchor: [0, -30]
+        });
+
+        function getActiveMarkerIcon() {
+            const selected = document.querySelector('input[name="account_type"]:checked')?.value || "user";
+            return selected === "store" ? storeIcon : customerIcon;
         }
 
-        function setUserMarker(latlng) {
-            if (!userMap) return;
-            if (userMarker) {
-                userMarker.setLatLng(latlng);
+        function setMapMarker(latlng) {
+            if (!regMap) return;
+            const currentIcon = getActiveMarkerIcon();
+            if (regMarker) {
+                regMarker.setLatLng(latlng);
+                regMarker.setIcon(currentIcon);
             } else {
-                userMarker = L.marker(latlng).addTo(userMap);
+                regMarker = L.marker(latlng, { icon: currentIcon }).addTo(regMap);
             }
-            userLatInput.value = latlng.lat.toFixed(6);
-            userLngInput.value = latlng.lng.toFixed(6);
-            setStatus(`Pinned: ${userLatInput.value}, ${userLngInput.value}`);
         }
 
-        async function reverseGeocodeUserAddress(lat, lng) {
-            if (!userAddressInput) return;
+        async function reverseGeocodeAddress(lat, lng, targetInput) {
+            if (!targetInput) return;
             try {
                 setStatus("Looking up address…");
                 const res = await fetch(
@@ -1188,7 +1283,7 @@ if ($cat_res) {
                 if (!res.ok) return;
                 const data = await res.json();
                 if (data && data.display_name) {
-                    userAddressInput.value = data.display_name;
+                    targetInput.value = data.display_name;
                     setStatus(`Pinned: ${lat.toFixed(5)}, ${lng.toFixed(5)}`);
                 }
             } catch (e) {
@@ -1196,72 +1291,62 @@ if ($cat_res) {
             }
         }
 
-        function initStoreMap() {
-            if (storeMap) {
-                setTimeout(() => storeMap.invalidateSize(), 50);
+        function initRegMap() {
+            if (regMap) {
+                regMap.invalidateSize();
                 return;
             }
-            storeMap = L.map("store-map").setView([14.5995, 120.9842], 13);
-            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-                attribution: "&copy; OpenStreetMap"
-            }).addTo(storeMap);
+            const mapContainer = document.getElementById("reg-map");
+            if (!mapContainer) return;
 
-            storeMap.on("click", (event) => {
-                setStoreMarker(event.latlng);
+            regMap = L.map("reg-map").setView([14.5995, 120.9842], 13);
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            }).addTo(regMap);
+
+            regMap.on("click", (event) => {
+                const selected = document.querySelector('input[name="account_type"]:checked')?.value || "user";
+                const isStore = selected === "store";
+                const lat = event.latlng.lat;
+                const lng = event.latlng.lng;
+
+                setMapMarker(event.latlng);
+
+                if (isStore) {
+                    if (storeLatInput) storeLatInput.value = lat.toFixed(6);
+                    if (storeLngInput) storeLngInput.value = lng.toFixed(6);
+                    setStatus(`Pinned: ${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+                    reverseGeocodeAddress(lat, lng, storeAddressInput);
+                } else {
+                    if (userLatInput) userLatInput.value = lat.toFixed(6);
+                    if (userLngInput) userLngInput.value = lng.toFixed(6);
+                    setStatus(`Pinned: ${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+                    reverseGeocodeAddress(lat, lng, userAddressInput);
+                }
             });
 
-            if (storeLatInput.value && storeLngInput.value) {
-                setStoreMarker({ lat: Number(storeLatInput.value), lng: Number(storeLngInput.value) });
-                storeMap.setView([Number(storeLatInput.value), Number(storeLngInput.value)], 15);
-                return;
+            // Auto-resize observer to guarantee zero gap on any layout reflow
+            if (window.ResizeObserver) {
+                const mapFrame = document.querySelector(".reg-map-frame");
+                if (mapFrame) {
+                    const ro = new ResizeObserver(() => {
+                        if (regMap) regMap.invalidateSize();
+                    });
+                    ro.observe(mapFrame);
+                }
             }
 
-            if ("geolocation" in navigator) {
+            // Fallback initial geolocation if no coords entered
+            const hasUserCoords = userLatInput && userLatInput.value && userLngInput && userLngInput.value;
+            const hasStoreCoords = storeLatInput && storeLatInput.value && storeLngInput && storeLngInput.value;
+            if (!hasUserCoords && !hasStoreCoords && ("geolocation" in navigator)) {
                 navigator.geolocation.getCurrentPosition(
                     (position) => {
-                        const coords = [position.coords.latitude, position.coords.longitude];
-                        storeMap.setView(coords, 14);
-                        setStatus("Tap map to pin your store");
+                        if (regMap) {
+                            regMap.setView([position.coords.latitude, position.coords.longitude], 14);
+                        }
                     },
-                    () => {
-                        setStatus("Tap map to pin your store");
-                    },
-                    { enableHighAccuracy: true, timeout: 8000 }
-                );
-            }
-        }
-
-        function initUserMap() {
-            if (userMap) {
-                setTimeout(() => userMap.invalidateSize(), 50);
-                return;
-            }
-            userMap = L.map("user-map").setView([14.5995, 120.9842], 13);
-            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-                attribution: "&copy; OpenStreetMap"
-            }).addTo(userMap);
-
-            userMap.on("click", (event) => {
-                setUserMarker(event.latlng);
-                reverseGeocodeUserAddress(event.latlng.lat, event.latlng.lng);
-            });
-
-            if (userLatInput.value && userLngInput.value) {
-                setUserMarker({ lat: Number(userLatInput.value), lng: Number(userLngInput.value) });
-                userMap.setView([Number(userLatInput.value), Number(userLngInput.value)], 15);
-                return;
-            }
-
-            if ("geolocation" in navigator) {
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        const coords = [position.coords.latitude, position.coords.longitude];
-                        userMap.setView(coords, 14);
-                        setStatus("Tap map to pin delivery location");
-                    },
-                    () => {
-                        setStatus("Tap map to pin delivery location");
-                    },
+                    () => {},
                     { enableHighAccuracy: true, timeout: 8000 }
                 );
             }
@@ -1304,14 +1389,15 @@ if ($cat_res) {
             } else {
                 sideMapContainer.style.display = "flex";
                 driverInfoPanel.style.display = "none";
+                initRegMap();
 
                 if (isStore) {
                     sideMapTitle.textContent = "Pin Store Location";
                     sideMapDesc.textContent = "Drop a pin to help customers find your store";
-                    userMapEl.style.display = "none";
-                    storeMapEl.style.display = "block";
-                    initStoreMap();
-                    if (storeLatInput.value && storeLngInput.value) {
+                    if (storeLatInput && storeLatInput.value && storeLngInput && storeLngInput.value) {
+                        const coords = [Number(storeLatInput.value), Number(storeLngInput.value)];
+                        setMapMarker(coords);
+                        regMap.setView(coords, 15);
                         setStatus(`Pinned: ${storeLatInput.value}, ${storeLngInput.value}`);
                     } else {
                         setStatus("Tap map to pin store location");
@@ -1319,14 +1405,25 @@ if ($cat_res) {
                 } else {
                     sideMapTitle.textContent = "Pin Delivery Location";
                     sideMapDesc.textContent = "Drop a pin to ensure accurate home delivery";
-                    storeMapEl.style.display = "none";
-                    userMapEl.style.display = "block";
-                    initUserMap();
-                    if (userLatInput.value && userLngInput.value) {
+                    if (userLatInput && userLatInput.value && userLngInput && userLngInput.value) {
+                        const coords = [Number(userLatInput.value), Number(userLngInput.value)];
+                        setMapMarker(coords);
+                        regMap.setView(coords, 15);
                         setStatus(`Pinned: ${userLatInput.value}, ${userLngInput.value}`);
                     } else {
                         setStatus("Tap map to pin delivery location");
                     }
+                }
+
+                if (regMarker) {
+                    regMarker.setIcon(getActiveMarkerIcon());
+                }
+
+                // Invalidate size immediately and after layout settle
+                if (regMap) {
+                    regMap.invalidateSize();
+                    setTimeout(() => regMap && regMap.invalidateSize(), 60);
+                    setTimeout(() => regMap && regMap.invalidateSize(), 200);
                 }
             }
         }
@@ -1335,7 +1432,7 @@ if ($cat_res) {
             radio.addEventListener("change", toggleAccountMode);
         });
 
-        // Initialize mode
+        // Initialize mode and map on load
         toggleAccountMode();
 
         /* ── Current Location Geolocation Button Handler ── */
@@ -1347,9 +1444,11 @@ if ($cat_res) {
 
             const btnMap = document.getElementById("use-current-location");
             const btnField = document.getElementById("use-current-location-field-btn");
+            const btnStoreField = document.getElementById("use-current-location-store-btn");
 
             if (btnMap) { btnMap.disabled = true; btnMap.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="2" x2="12" y2="6"/></svg> <span>Locating…</span>'; }
             if (btnField) { btnField.disabled = true; btnField.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite;"><circle cx="12" cy="12" r="10"/></svg> <span>Locating…</span>'; }
+            if (btnStoreField) { btnStoreField.disabled = true; btnStoreField.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite;"><circle cx="12" cy="12" r="10"/></svg> <span>Locating…</span>'; }
             setStatus("Getting GPS location…");
 
             const selected = document.querySelector('input[name="account_type"]:checked')?.value || "user";
@@ -1360,30 +1459,34 @@ if ($cat_res) {
                     const lat = position.coords.latitude;
                     const lng = position.coords.longitude;
                     
+                    initRegMap();
+                    setMapMarker([lat, lng]);
+                    if (regMap) {
+                        regMap.setView([lat, lng], 15);
+                        regMap.invalidateSize();
+                    }
+
                     if (isStore) {
-                        initStoreMap();
-                        if (typeof setStoreMarker === "function" && storeMap) {
-                            setStoreMarker({ lat, lng });
-                            storeMap.setView([lat, lng], 15);
-                        }
+                        if (storeLatInput) storeLatInput.value = lat.toFixed(6);
+                        if (storeLngInput) storeLngInput.value = lng.toFixed(6);
+                        reverseGeocodeAddress(lat, lng, storeAddressInput);
                     } else {
-                        initUserMap();
-                        if (typeof setUserMarker === "function" && userMap) {
-                            setUserMarker({ lat, lng });
-                            userMap.setView([lat, lng], 15);
-                        }
-                        reverseGeocodeUserAddress(lat, lng);
+                        if (userLatInput) userLatInput.value = lat.toFixed(6);
+                        if (userLngInput) userLngInput.value = lng.toFixed(6);
+                        reverseGeocodeAddress(lat, lng, userAddressInput);
                     }
 
                     const mapIconHtml = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>';
                     if (btnMap) { btnMap.disabled = false; btnMap.innerHTML = `${mapIconHtml} <span>Use My GPS</span>`; }
                     if (btnField) { btnField.disabled = false; btnField.innerHTML = `${mapIconHtml} <span>GPS</span>`; }
+                    if (btnStoreField) { btnStoreField.disabled = false; btnStoreField.innerHTML = `${mapIconHtml} <span>GPS</span>`; }
                 },
                 () => {
                     setStatus("Location access denied or unavailable.");
                     const mapIconHtml = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>';
                     if (btnMap) { btnMap.disabled = false; btnMap.innerHTML = `${mapIconHtml} <span>Use My GPS</span>`; }
                     if (btnField) { btnField.disabled = false; btnField.innerHTML = `${mapIconHtml} <span>GPS</span>`; }
+                    if (btnStoreField) { btnStoreField.disabled = false; btnStoreField.innerHTML = `${mapIconHtml} <span>GPS</span>`; }
                 },
                 { enableHighAccuracy: true, timeout: 10000 }
             );
@@ -1391,52 +1494,47 @@ if ($cat_res) {
 
         const mapLocBtn = document.getElementById("use-current-location");
         const fieldLocBtn = document.getElementById("use-current-location-field-btn");
+        const storeFieldLocBtn = document.getElementById("use-current-location-store-btn");
         if (mapLocBtn) mapLocBtn.addEventListener("click", fetchCurrentLocation);
         if (fieldLocBtn) fieldLocBtn.addEventListener("click", fetchCurrentLocation);
+        if (storeFieldLocBtn) storeFieldLocBtn.addEventListener("click", fetchCurrentLocation);
 
-        /* ── Address Autofill (Nominatim) for user delivery address ── */
-        (function () {
-            const addrInput   = document.getElementById("user_address");
-            const addrSugBox  = document.getElementById("user-addr-suggestions");
-            const addrSpinner = document.getElementById("user-addr-spinner");
-            const addrLatInp  = document.getElementById("user_lat");
-            const addrLngInp  = document.getElementById("user_lng");
-
-            if (!addrInput || !addrSugBox) return;
-
-            document.body.appendChild(addrSugBox);
+        /* ── Address Autofill Helper (Nominatim) for User & Store ── */
+        function setupAddressAutofill(inputEl, sugBoxEl, spinnerEl, latInp, lngInp) {
+            if (!inputEl || !sugBoxEl) return;
+            document.body.appendChild(sugBoxEl);
 
             let debounceTimer  = null;
             let activeIndex    = -1;
             let currentResults = [];
 
             function positionDropdown() {
-                const rect = addrInput.getBoundingClientRect();
-                addrSugBox.style.top   = (rect.bottom + 4) + "px";
-                addrSugBox.style.left  = rect.left + "px";
-                addrSugBox.style.width = rect.width + "px";
+                const rect = inputEl.getBoundingClientRect();
+                sugBoxEl.style.top   = (rect.bottom + 4) + "px";
+                sugBoxEl.style.left  = rect.left + "px";
+                sugBoxEl.style.width = rect.width + "px";
             }
 
             function showSpinner(show) {
-                addrSpinner && addrSpinner.classList.toggle("visible", show);
+                spinnerEl && spinnerEl.classList.toggle("visible", show);
             }
 
             function closeSuggestions() {
-                addrSugBox.classList.remove("open");
-                addrSugBox.innerHTML = "";
+                sugBoxEl.classList.remove("open");
+                sugBoxEl.innerHTML = "";
                 activeIndex    = -1;
                 currentResults = [];
             }
 
             function openSuggestions(results) {
-                addrSugBox.innerHTML = "";
+                sugBoxEl.innerHTML = "";
                 currentResults = results;
                 activeIndex    = -1;
                 if (!results.length) {
                     const empty = document.createElement("div");
                     empty.className = "address-suggestion-item";
                     empty.innerHTML = `<span class="sug-icon">⚠</span><span class="sug-text"><strong>No results found</strong><span>Try a more specific address</span></span>`;
-                    addrSugBox.appendChild(empty);
+                    sugBoxEl.appendChild(empty);
                 } else {
                     results.forEach((r, i) => {
                         const parts     = r.display_name.split(", ");
@@ -1451,34 +1549,35 @@ if ($cat_res) {
                             e.preventDefault();
                             selectResult(i);
                         });
-                        addrSugBox.appendChild(item);
+                        sugBoxEl.appendChild(item);
                     });
                 }
                 positionDropdown();
-                addrSugBox.classList.add("open");
+                sugBoxEl.classList.add("open");
             }
 
             function highlightItem(index) {
-                const items = addrSugBox.querySelectorAll(".address-suggestion-item");
+                const items = sugBoxEl.querySelectorAll(".address-suggestion-item");
                 items.forEach((el, i) => el.classList.toggle("active", i === index));
             }
 
             function selectResult(index) {
                 const r = currentResults[index];
                 if (!r) return;
-                addrInput.value = r.display_name;
+                inputEl.value = r.display_name;
                 const lat = parseFloat(r.lat);
                 const lng = parseFloat(r.lon);
-                if (addrLatInp) addrLatInp.value = lat.toFixed(6);
-                if (addrLngInp) addrLngInp.value = lng.toFixed(6);
-                if (typeof initUserMap === "function") initUserMap();
-                if (typeof setUserMarker === "function" && userMap) {
-                    setUserMarker({ lat, lng });
-                    userMap.setView([lat, lng], 15);
-                    setStatus(`Pinned: ${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+                if (latInp) latInp.value = lat.toFixed(6);
+                if (lngInp) lngInp.value = lng.toFixed(6);
+                initRegMap();
+                setMapMarker([lat, lng]);
+                if (regMap) {
+                    regMap.setView([lat, lng], 15);
+                    regMap.invalidateSize();
                 }
+                setStatus(`Pinned: ${lat.toFixed(5)}, ${lng.toFixed(5)}`);
                 closeSuggestions();
-                addrInput.focus();
+                inputEl.focus();
             }
 
             async function fetchSuggestions(query) {
@@ -1496,9 +1595,9 @@ if ($cat_res) {
                 }
             }
 
-            addrInput.addEventListener("input", () => {
+            inputEl.addEventListener("input", () => {
                 clearTimeout(debounceTimer);
-                const val = addrInput.value.trim();
+                const val = inputEl.value.trim();
                 if (val.length < 3) {
                     closeSuggestions();
                     showSpinner(false);
@@ -1508,9 +1607,9 @@ if ($cat_res) {
                 debounceTimer = setTimeout(() => fetchSuggestions(val), 400);
             });
 
-            addrInput.addEventListener("keydown", (e) => {
-                const items = addrSugBox.querySelectorAll(".address-suggestion-item[data-index]");
-                if (!addrSugBox.classList.contains("open") || !items.length) return;
+            inputEl.addEventListener("keydown", (e) => {
+                const items = sugBoxEl.querySelectorAll(".address-suggestion-item[data-index]");
+                if (!sugBoxEl.classList.contains("open") || !items.length) return;
                 if (e.key === "ArrowDown") {
                     e.preventDefault();
                     activeIndex = (activeIndex + 1) % items.length;
@@ -1527,14 +1626,30 @@ if ($cat_res) {
                 }
             });
 
-            addrInput.addEventListener("blur", () => {
+            inputEl.addEventListener("blur", () => {
                 setTimeout(closeSuggestions, 180);
             });
 
             window.addEventListener("resize", () => {
-                if (addrSugBox.classList.contains("open")) positionDropdown();
+                if (sugBoxEl.classList.contains("open")) positionDropdown();
             });
-        })();
+        }
+
+        setupAddressAutofill(
+            document.getElementById("user_address"),
+            document.getElementById("user-addr-suggestions"),
+            document.getElementById("user-addr-spinner"),
+            document.getElementById("user_lat"),
+            document.getElementById("user_lng")
+        );
+
+        setupAddressAutofill(
+            document.getElementById("store_address"),
+            document.getElementById("store-addr-suggestions"),
+            document.getElementById("store-addr-spinner"),
+            document.getElementById("store_lat"),
+            document.getElementById("store_lng")
+        );
     </script>
 </body>
 </html>

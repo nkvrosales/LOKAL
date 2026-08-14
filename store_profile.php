@@ -20,7 +20,7 @@ $store = null;
 $products = [];
 
 $stmt = $mysqli->prepare(
-    "SELECT id, store_name, first_name, last_name, store_address, store_lat, store_lng, store_contact, contact, email
+    "SELECT id, store_name, first_name, last_name, store_address, store_lat, store_lng, store_contact, contact, email, store_category, profile_image
      FROM users
      WHERE id = ?
        AND account_type = 'store'
@@ -39,7 +39,9 @@ if ($stmt) {
         $storeLng,
         $storeContact,
         $defaultContact,
-        $email
+        $email,
+        $storeCategory,
+        $profileImage
     );
     if ($stmt->fetch()) {
         $fallbackName = trim((string) $firstName . " " . (string) $lastName);
@@ -60,6 +62,8 @@ if ($stmt) {
             "lng" => $storeLng !== null ? (float) $storeLng : null,
             "contact" => $displayContact,
             "email" => (string) ($email ?? ""),
+            "category" => (string) ($storeCategory ?? "Store"),
+            "profile_image" => (string) ($profileImage ?? ""),
         ];
     }
     $stmt->close();
@@ -71,25 +75,61 @@ if (!$store) {
 }
 
 $productStmt = $mysqli->prepare(
-    "SELECT id, product_name, product_description, product_price
+    "SELECT id, product_name, product_description, product_price, product_image
      FROM store_products
-     WHERE store_user_id = ?
+     WHERE store_user_id = ? AND is_active = 1
      ORDER BY id DESC"
 );
 if ($productStmt) {
     $productStmt->bind_param("i", $storeId);
     $productStmt->execute();
-    $productStmt->bind_result($productId, $productName, $productDescription, $productPrice);
+    $productStmt->bind_result($productId, $productName, $productDescription, $productPrice, $productImage);
     while ($productStmt->fetch()) {
         $products[] = [
-            "id" => (int) $productId,
-            "name" => trim((string) ($productName ?? "")),
+            "id"          => (int) $productId,
+            "name"        => trim((string) ($productName ?? "")),
             "description" => trim((string) ($productDescription ?? "")),
-            "price" => $productPrice !== null ? (float) $productPrice : null,
+            "price"       => $productPrice !== null ? (float) $productPrice : null,
             "price_label" => $format_price_label($productPrice),
+            "image"       => $productImage ? trim((string) $productImage) : null,
         ];
     }
     $productStmt->close();
+}
+
+// Check active pickup orders for this customer at this store
+$currentUserId = (int) ($_SESSION["user_id"] ?? 0);
+$readyPickupOrders = [];
+if ($currentUserId > 0) {
+    $pickupCheckStmt = $mysqli->prepare(
+        "SELECT id, status, scheduled_time, created_at, accepted_at, pickup_at
+         FROM orders
+         WHERE customer_user_id = ?
+           AND store_user_id = ?
+           AND order_type = 'pickup'
+           AND (
+             status IN ('pending', 'for_pickup', 'delivering')
+             OR (status = 'completed' AND DATE(delivered_at) = CURRENT_DATE())
+           )
+         ORDER BY id DESC
+         LIMIT 3"
+    );
+    if ($pickupCheckStmt) {
+        $pickupCheckStmt->bind_param("ii", $currentUserId, $storeId);
+        $pickupCheckStmt->execute();
+        $pickupCheckStmt->bind_result($pId, $pStatus, $pSched, $pCreated, $pAccepted, $pPickup);
+        while ($pickupCheckStmt->fetch()) {
+            $isReady = in_array($pStatus, ["for_pickup", "delivering", "completed"], true);
+            $readyPickupOrders[] = [
+                "id" => (int) $pId,
+                "status" => (string) $pStatus,
+                "scheduled_time" => (string) ($pSched ?: "ASAP"),
+                "created_at" => (string) $pCreated,
+                "is_ready" => $isReady,
+            ];
+        }
+        $pickupCheckStmt->close();
+    }
 }
 
 $storeForCart = $store;
@@ -103,7 +143,7 @@ $storeForCart["products"] = $products;
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo escape($store["name"]); ?> | Lokal</title>
     <link rel="stylesheet" href="assets/styles.css?v=primary-bw-icons-1">
-    <link rel="stylesheet" href="assets/store-admin.css?v=hover-effects-1">
+    <link rel="stylesheet" href="assets/store-admin.css?v=store-enhancements-3">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 </head>
 <body class="store-admin-body">
@@ -122,7 +162,7 @@ $storeForCart["products"] = $products;
             </a>
             <a class="store-admin-tab" href="order_history.php">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                <span>Order History</span>
+                <span>Orders</span>
             </a>
             <?php if (($_SESSION["account_type"] ?? "") !== "store"): ?>
                 <a class="store-admin-tab" href="cart.php">
@@ -138,55 +178,156 @@ $storeForCart["products"] = $products;
     </header>
 
     <main class="public-store-shell">
-        <section class="public-store-head">
-            <div>
-                <a class="back-link" href="home.php">Back to stores</a>
-                <h1><?php echo escape($store["name"]); ?></h1>
-                <p><?php echo escape($store["address"] !== "" ? $store["address"] : "Store location not listed."); ?></p>
+
+        <!-- â”€â”€ PICKUP ORDER READY NOTIFICATION BANNER â”€â”€ -->
+        <?php 
+        $activeReadyOrder = null;
+        foreach ($readyPickupOrders as $ro) {
+            if ($ro["is_ready"]) {
+                $activeReadyOrder = $ro;
+                break;
+            }
+        }
+        ?>
+        <?php if ($activeReadyOrder): ?>
+            <aside class="pickup-ready-banner" id="pickup-ready-banner" role="alert">
+                <div class="pickup-banner-left">
+                    <div class="pickup-banner-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                    </div>
+                    <div class="pickup-banner-text">
+                        <h4>Your Order #<?php echo $activeReadyOrder["id"]; ?> is Ready for Pickup!</h4>
+                        <p>Your order at <strong><?php echo escape($store["name"]); ?></strong> is prepared. Please visit the store counter to pick it up. (Time: <?php echo escape($activeReadyOrder["scheduled_time"]); ?>)</p>
+                    </div>
+                </div>
+                <div class="pickup-banner-actions">
+                    <a href="order_history.php" class="pickup-banner-btn">View Order</a>
+                    <button type="button" class="pickup-banner-close" onclick="document.getElementById('pickup-ready-banner').style.display='none'" aria-label="Dismiss banner">&times;</button>
+                </div>
+            </aside>
+        <?php endif; ?>
+
+        <!-- â”€â”€ STORE HERO HEADER â”€â”€ -->
+        <section class="store-hero-head">
+            <div class="store-hero-left">
+                <div class="store-hero-avatar">
+                    <?php if (!empty($store["profile_image"]) && file_exists(__DIR__ . "/uploads/profiles/" . $store["profile_image"])): ?>
+                        <img src="uploads/profiles/<?php echo escape($store["profile_image"]); ?>" alt="<?php echo escape($store["name"]); ?>">
+                    <?php else: ?>
+                        <span><?php echo strtoupper(substr($store["name"] ?: "S", 0, 1)); ?></span>
+                    <?php endif; ?>
+                </div>
+                <div class="store-hero-info">
+                    <a class="back-link" href="home.php" style="margin-bottom:4px; display:inline-flex; align-items:center; gap:4px;">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                        Back to stores
+                    </a>
+                    <h1>
+                        <?php echo escape($store["name"]); ?>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="#3B82F6" stroke="#fff" stroke-width="2"><path d="M12 2l2.4 5.2 5.6.8-4 4.1 1 5.7-5-2.8-5 2.8 1-5.7-4-4.1 5.6-.8z"/></svg>
+                    </h1>
+                    <div class="store-hero-badges">
+                        <span class="store-badge-cat"><?php echo escape($store["category"]); ?></span>
+                        <span class="store-badge-open">Open for Orders</span>
+                    </div>
+                    <p class="store-hero-address">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                        <?php echo escape($store["address"] !== "" ? $store["address"] : "Store location not listed."); ?>
+                    </p>
+                    <div class="store-hero-contact-links">
+                        <?php if ($store["contact"] !== ""): ?>
+                            <a class="store-contact-pill" href="tel:<?php echo escape($store["contact"]); ?>">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                                <?php echo escape($store["contact"]); ?>
+                            </a>
+                        <?php endif; ?>
+                        <?php if ($store["email"] !== ""): ?>
+                            <a class="store-contact-pill" href="mailto:<?php echo escape($store["email"]); ?>">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                                Email Store
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                </div>
             </div>
-            <button type="button" class="btn public-cart-link" id="public-cart-open">Open Cart <span id="public-cart-count">0</span></button>
         </section>
 
+        <!-- â”€â”€ STORE DATA & MAP â”€â”€ -->
         <section class="public-store-grid">
             <article class="public-store-card">
-                <h2>Store Data</h2>
-                <p><strong>Contact:</strong> <?php echo escape($store["contact"] !== "" ? $store["contact"] : "Not listed"); ?></p>
-                <p><strong>Email:</strong> <?php echo escape($store["email"] !== "" ? $store["email"] : "Not listed"); ?></p>
-                <p><strong>Products:</strong> <?php echo count($products); ?></p>
+                <h2>Store Information</h2>
+                <div style="display:flex; flex-direction:column; gap:10px; margin-top:10px;">
+                    <p style="margin:0;"><strong>Available Products:</strong> <?php echo count($products); ?> items</p>
+                    <p style="margin:0;"><strong>Service Options:</strong> Delivery (PHP 40.00) &amp; Store Pickup (Free)</p>
+                    <p style="margin:0;"><strong>Order Schedule:</strong> ASAP (20-35 mins) or Scheduled Time Slot</p>
+                    <p style="margin:0;"><strong>Location:</strong> <?php echo escape($store["address"] !== "" ? $store["address"] : "Not listed"); ?></p>
+                </div>
             </article>
 
             <article class="public-store-card">
-                <h2>Location</h2>
+                <h2>Store Location</h2>
                 <div id="public-store-map"></div>
             </article>
         </section>
 
+        <!-- â”€â”€ PRODUCTS SECTION â”€â”€ -->
         <section class="public-store-products">
             <div class="public-store-section-head">
-                <h2>Products</h2>
-                <p id="cart-status">Add products here, then open the cart to update quantities.</p>
+                <div>
+                    <h2>Products</h2>
+                    <p id="cart-status">Choose delivery or pickup, select your preferred time, and add items to cart.</p>
+                </div>
+                <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                    <div class="store-search-bar">
+                        <svg class="store-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <input type="text" id="store-product-search" class="store-search-input" placeholder="Search products in this store...">
+                    </div>
+                    <button type="button" class="btn public-cart-link" id="public-cart-open">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.8"/><circle cx="18" cy="20" r="1.8"/><path d="M3 4h2.5l2.2 11.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 8H7"/></svg>
+                        Open Cart <span id="public-cart-count">0</span>
+                    </button>
+                </div>
             </div>
 
             <?php if ($products): ?>
-                <div class="public-product-list">
+                <div class="public-product-list" id="public-product-list">
                     <?php foreach ($products as $product): ?>
-                        <article class="public-product-item">
-                            <div>
+                        <article class="public-product-item" data-product-name="<?php echo strtolower(escape($product["name"])); ?>">
+                            <div class="public-product-img-wrap">
+                                <?php if (!empty($product["image"]) && file_exists(__DIR__ . "/uploads/products/" . $product["image"])): ?>
+                                    <img class="public-product-img" src="uploads/products/<?php echo escape($product["image"]); ?>" alt="<?php echo escape($product["name"]); ?>" loading="lazy">
+                                <?php else: ?>
+                                    <div class="public-product-img-placeholder">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                            <rect x="3" y="3" width="18" height="18" rx="3"/>
+                                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                                            <polyline points="21 15 16 10 5 21"/>
+                                        </svg>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                            <div class="public-product-body">
                                 <h3><?php echo escape($product["name"] !== "" ? $product["name"] : "Product"); ?></h3>
                                 <p class="public-product-price"><?php echo escape($product["price_label"] !== "" ? $product["price_label"] : "Price not set"); ?></p>
                                 <?php if ($product["description"] !== ""): ?>
-                                    <p><?php echo escape($product["description"]); ?></p>
+                                    <p class="public-product-desc"><?php echo escape($product["description"]); ?></p>
                                 <?php endif; ?>
                             </div>
                             <div class="public-add-controls">
-                                <label>
+                                <label class="public-qty-label">
                                     <span>Qty</span>
                                     <input type="number" min="1" max="99" value="1" inputmode="numeric" data-product-quantity>
                                 </label>
-                                <button type="button" data-product-id="<?php echo (int) $product["id"]; ?>">Add to cart</button>
+                                <button type="button" class="public-add-btn" data-product-id="<?php echo (int) $product["id"]; ?>">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                    Add to cart
+                                </button>
                             </div>
                         </article>
                     <?php endforeach; ?>
+                </div>
+                <div id="no-products-search-msg" style="display:none; text-align:center; padding:40px 20px; color:#64748B;">
+                    No products matched your search.
                 </div>
             <?php else: ?>
                 <p class="store-products-empty">No products listed yet.</p>
@@ -194,29 +335,69 @@ $storeForCart["products"] = $products;
         </section>
     </main>
 
+    <!-- â”€â”€ ENHANCED CART MODAL WITH DELIVERY/PICKUP & TIME SELECTION â”€â”€ -->
     <section class="public-cart-modal" id="public-cart-modal" aria-label="Cart" hidden>
         <div class="public-cart-backdrop" data-cart-close></div>
-        <div class="public-cart-panel" role="dialog" aria-modal="true" aria-labelledby="public-cart-title">
+        <div class="public-cart-panel" role="dialog" aria-modal="true" aria-labelledby="public-cart-title" style="width:min(480px, 100%);">
             <div class="public-cart-head">
                 <div>
-                    <h2 id="public-cart-title">Cart</h2>
+                    <h2 id="public-cart-title">Your Cart</h2>
                     <p id="public-cart-summary">No items yet.</p>
                 </div>
                 <button type="button" class="public-cart-close" data-cart-close aria-label="Close cart">&times;</button>
             </div>
+
+            <!-- Service Mode Selection: Delivery vs Pickup -->
+            <div class="cart-delivery-choice" id="cart-service-choice">
+                <button type="button" class="cart-choice-btn active" data-service-type="delivery">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18.5" cy="17.5" r="2.5"/><circle cx="5.5" cy="17.5" r="2.5"/><path d="M12 17.5V14l-3-3 4-3 2 3h4"/></svg>
+                    Delivery
+                </button>
+                <button type="button" class="cart-choice-btn" data-service-type="pickup">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                    Pickup
+                </button>
+            </div>
+
+            <!-- Time Selection: Delivery / Pickup Time -->
+            <div class="cart-time-section">
+                <div class="cart-time-header">
+                    <span id="cart-time-title">Delivery Time</span>
+
+                </div>
+                <select id="cart-time-select" class="cart-time-select">
+                    <option value="ASAP" selected>ASAP (Estimated 20-35 mins)</option>
+                </select>
+            </div>
+
+            <!-- Cart Items List -->
             <div class="public-cart-items" id="public-cart-items"></div>
+
+            <!-- Order Total Breakdown & Action -->
             <div class="public-cart-foot">
-                <div>
-                    <span>Total</span>
+                <div class="cart-summary-row">
+                    <span>Subtotal</span>
+                    <strong id="cart-breakdown-subtotal">PHP 0.00</strong>
+                </div>
+                <div class="cart-summary-row">
+                    <span id="cart-breakdown-fee-label">Delivery Fee</span>
+                    <strong id="cart-breakdown-fee">PHP 40.00</strong>
+                </div>
+                <div class="cart-summary-row total-row">
+                    <span>Total Amount</span>
                     <strong id="public-cart-total">PHP 0.00</strong>
                 </div>
-                <div class="public-cart-actions">
-                    <a class="btn public-cart-checkout" href="store_checkout.php?store_id=<?php echo (int) $store["id"]; ?>">Checkout</a>
+
+                <div class="public-cart-actions" style="margin-top:8px; width:100%;">
+                    <button type="button" class="btn public-cart-checkout" id="cart-checkout-btn" style="flex:1;">Proceed to Checkout</button>
                     <button type="button" class="public-cart-clear" id="public-cart-clear">Clear</button>
                 </div>
             </div>
         </div>
     </section>
+
+    <!-- â”€â”€ DYNAMIC FLOATING NOTIFICATION TOAST CONTAINER â”€â”€ -->
+    <div id="pickup-toast-container"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script>
@@ -230,6 +411,15 @@ $storeForCart["products"] = $products;
         const publicCartSummary = document.getElementById("public-cart-summary");
         const publicCartTotal = document.getElementById("public-cart-total");
         const publicCartClear = document.getElementById("public-cart-clear");
+        const cartSubtotalEl = document.getElementById("cart-breakdown-subtotal");
+        const cartFeeEl = document.getElementById("cart-breakdown-fee");
+        const cartFeeLabelEl = document.getElementById("cart-breakdown-fee-label");
+        const cartTimeTitleEl = document.getElementById("cart-time-title");
+        const cartTimeSelect = document.getElementById("cart-time-select");
+        const cartCheckoutBtn = document.getElementById("cart-checkout-btn");
+
+        let currentServiceType = "delivery"; // 'delivery' or 'pickup'
+        const baseDeliveryFee = 40.0;
 
         function setStatus(message) {
             if (statusEl) {
@@ -287,7 +477,7 @@ $storeForCart["products"] = $products;
         function formatCartPrice(value) {
             const amount = Number(value);
             if (!Number.isFinite(amount)) {
-                return "Price not set";
+                return "PHP 0.00";
             }
             return `PHP ${amount.toLocaleString(undefined, {
                 minimumFractionDigits: 2,
@@ -295,7 +485,7 @@ $storeForCart["products"] = $products;
             })}`;
         }
 
-        function getCartTotal(items = loadCart()) {
+        function getCartSubtotal(items = loadCart()) {
             return items.reduce((total, item) => {
                 const price = Number(item.price);
                 return Number.isFinite(price)
@@ -313,42 +503,170 @@ $storeForCart["products"] = $products;
         function renderCart() {
             const items = loadCart();
             const itemCount = getCartItemCount(items);
+            const subtotal = getCartSubtotal(items);
+            const fee = currentServiceType === "pickup" ? 0.0 : (itemCount > 0 ? baseDeliveryFee : 0.0);
+            const grandTotal = subtotal + fee;
+
             renderCartCount();
+
             if (publicCartSummary) {
                 publicCartSummary.textContent = itemCount === 0
                     ? "No items yet."
                     : `${items.length} product${items.length === 1 ? "" : "s"}, ${itemCount} item${itemCount === 1 ? "" : "s"}.`;
             }
-            if (publicCartTotal) {
-                publicCartTotal.textContent = formatCartPrice(getCartTotal(items));
+
+            if (cartSubtotalEl) {
+                cartSubtotalEl.textContent = formatCartPrice(subtotal);
             }
+
+            if (cartFeeEl && cartFeeLabelEl) {
+                if (currentServiceType === "pickup") {
+                    cartFeeLabelEl.textContent = "Pickup Fee";
+                    cartFeeEl.textContent = "PHP 0.00";
+                    cartFeeEl.style.color = "#10B981";
+                } else {
+                    cartFeeLabelEl.textContent = "Delivery Fee";
+                    cartFeeEl.textContent = formatCartPrice(fee);
+                    cartFeeEl.style.color = "#0F172A";
+                }
+            }
+
+            if (publicCartTotal) {
+                publicCartTotal.textContent = formatCartPrice(grandTotal);
+            }
+
             if (publicCartClear) {
                 publicCartClear.disabled = itemCount === 0;
             }
+
+            if (cartCheckoutBtn) {
+                cartCheckoutBtn.disabled = itemCount === 0;
+            }
+
             if (!publicCartItems) {
                 return;
             }
+
             if (!items.length) {
                 publicCartItems.innerHTML = `<p class="public-cart-empty">Your cart is empty.</p>`;
                 return;
             }
+
             publicCartItems.innerHTML = items.map((item) => {
                 const quantity = normalizeQuantity(item.quantity);
                 const price = Number(item.price);
                 const lineTotal = Number.isFinite(price) ? formatCartPrice(price * quantity) : "Price not set";
-                return `<article class="public-cart-item" data-cart-key="${escapeHtml(item.key)}">
-                            <div>
-                                <strong>${escapeHtml(item.name || "Product")}</strong>
-                                <span>${escapeHtml(lineTotal)}</span>
+                return `
+                    <article class="public-cart-item" data-cart-key="${escapeHtml(item.key)}" style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:1px solid #E2E8F0; border-radius:12px; background:#F8FAFC;">
+                        <div style="flex:1; min-width:0;">
+                            <strong style="display:block; font-size:14px; color:#0F172A; margin-bottom:2px;">${escapeHtml(item.name || "Product")}</strong>
+                            <span style="font-size:12.5px; color:#FF5B2E; font-weight:700;">${escapeHtml(lineTotal)}</span>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <div class="cart-item-stepper">
+                                <button type="button" class="cart-step-btn" data-cart-action="decrease" aria-label="Decrease quantity">âˆ’</button>
+                                <span class="cart-step-val">${quantity}</span>
+                                <button type="button" class="cart-step-btn" data-cart-action="increase" aria-label="Increase quantity">+</button>
                             </div>
-                            <div class="public-cart-qty">
-                                <button type="button" data-cart-action="decrease" aria-label="Decrease quantity">-</button>
-                                <span>${quantity}</span>
-                                <button type="button" data-cart-action="increase" aria-label="Increase quantity">+</button>
-                                <button type="button" data-cart-action="remove">Remove</button>
-                            </div>
-                        </article>`;
+                            <button type="button" class="cart-remove-item" data-cart-action="remove" title="Remove item" aria-label="Remove item">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                            </button>
+                        </div>
+                    </article>
+                `;
             }).join("");
+        }
+
+        // â”€â”€ Smart Time Slot Generator (Current Time Aware, No Emojis) â”€â”€
+        function generateSmartTimeSlots(selectedVal = "ASAP") {
+            const slots = [];
+            slots.push({ value: "ASAP", text: "ASAP (Estimated 20-35 mins)" });
+
+            const now = new Date();
+            // Start 30 minutes from now
+            const start = new Date(now.getTime() + 30 * 60 * 1000);
+            
+            // Round up to the next 30-minute boundary
+            const mins = start.getMinutes();
+            if (mins > 0 && mins <= 30) {
+                start.setMinutes(30, 0, 0);
+            } else if (mins > 30) {
+                start.setHours(start.getHours() + 1, 0, 0, 0);
+            }
+
+            function formatTime(d) {
+                let hours = d.getHours();
+                const ampm = hours >= 12 ? "PM" : "AM";
+                hours = hours % 12;
+                if (hours === 0) hours = 12;
+                const m = d.getMinutes().toString().padStart(2, "0");
+                return `${hours}:${m} ${ampm}`;
+            }
+
+            // Generate slots for Today up to 10:00 PM (hour 22)
+            let current = new Date(start.getTime());
+            const endToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 22, 0, 0);
+
+            while (current < endToday) {
+                const slotEnd = new Date(current.getTime() + 30 * 60 * 1000);
+                const label = `Today, ${formatTime(current)} - ${formatTime(slotEnd)}`;
+                slots.push({ value: label, text: label });
+                current = new Date(current.getTime() + 30 * 60 * 1000);
+            }
+
+            // Add Tomorrow slots from 9:00 AM to 9:00 PM
+            const tmrw = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 9, 0, 0);
+            const endTmrw = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 21, 0, 0);
+            let tmrwCurrent = new Date(tmrw.getTime());
+
+            while (tmrwCurrent < endTmrw) {
+                const slotEnd = new Date(tmrwCurrent.getTime() + 60 * 60 * 1000);
+                const label = `Tomorrow, ${formatTime(tmrwCurrent)} - ${formatTime(slotEnd)}`;
+                slots.push({ value: label, text: label });
+                tmrwCurrent = new Date(tmrwCurrent.getTime() + 60 * 60 * 1000);
+            }
+
+            return slots;
+        }
+
+        function populateTimeSelect(selectEl, selectedVal = "ASAP") {
+            if (!selectEl) return;
+            const currentSelected = selectedVal || selectEl.value || "ASAP";
+            const slots = generateSmartTimeSlots(currentSelected);
+            selectEl.innerHTML = "";
+            slots.forEach(slot => {
+                const opt = document.createElement("option");
+                opt.value = slot.value;
+                opt.textContent = slot.text;
+                if (slot.value === currentSelected) {
+                    opt.selected = true;
+                }
+                selectEl.appendChild(opt);
+            });
+        }
+
+        // Service Type Switcher (Delivery vs Pickup)
+        document.querySelectorAll("#cart-service-choice .cart-choice-btn").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                document.querySelectorAll("#cart-service-choice .cart-choice-btn").forEach((b) => b.classList.remove("active"));
+                btn.classList.add("active");
+                currentServiceType = btn.dataset.serviceType || "delivery";
+
+                if (cartTimeTitleEl) {
+                    cartTimeTitleEl.textContent = currentServiceType === "pickup" ? "Pickup Time" : "Delivery Time";
+                }
+
+                renderCart();
+            });
+        });
+
+        // Checkout Button Click Handler
+        if (cartCheckoutBtn) {
+            cartCheckoutBtn.addEventListener("click", () => {
+                const selectedTime = cartTimeSelect ? cartTimeSelect.value : "ASAP";
+                const checkoutUrl = `store_checkout.php?store_id=${encodeURIComponent(store.id)}&order_type=${encodeURIComponent(currentServiceType)}&scheduled_time=${encodeURIComponent(selectedTime)}`;
+                window.location.href = checkoutUrl;
+            });
         }
 
         function setCartModalOpen(isOpen) {
@@ -357,6 +675,7 @@ $storeForCart["products"] = $products;
             }
             publicCartModal.hidden = !isOpen;
             if (isOpen) {
+                populateTimeSelect(cartTimeSelect);
                 renderCart();
             }
         }
@@ -400,7 +719,19 @@ $storeForCart["products"] = $products;
             }
             saveCart(items);
             renderCart();
-            setStatus(`${product.name || "Product"} quantity in cart: ${nextQuantity}. Cart has ${getCartItemCount(items)} item(s).`);
+            setStatus(`Added ${amount} × ${product.name || "Product"} to cart.`);
+
+            // Button feedback animation
+            const btn = document.querySelector(`[data-product-id="${productId}"]`);
+            if (btn) {
+                const origHtml = btn.innerHTML;
+                btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Added!`;
+                btn.style.background = "#10B981";
+                setTimeout(() => {
+                    btn.innerHTML = origHtml;
+                    btn.style.background = "";
+                }, 1200);
+            }
         }
 
         function updateCartItem(cartKey, nextQuantity) {
@@ -479,8 +810,81 @@ $storeForCart["products"] = $products;
             }
         });
 
+        // â”€â”€ Real-time Product Search â”€â”€
+        const searchInput = document.getElementById("store-product-search");
+        const productItems = document.querySelectorAll("#public-product-list .public-product-item");
+        const noSearchMsg = document.getElementById("no-products-search-msg");
+
+        if (searchInput) {
+            searchInput.addEventListener("input", (e) => {
+                const q = e.target.value.trim().toLowerCase();
+                let matchedCount = 0;
+                productItems.forEach((item) => {
+                    const name = item.dataset.productName || "";
+                    if (!q || name.includes(q)) {
+                        item.style.display = "";
+                        matchedCount++;
+                    } else {
+                        item.style.display = "none";
+                    }
+                });
+                if (noSearchMsg) {
+                    noSearchMsg.style.display = matchedCount === 0 && q ? "block" : "none";
+                }
+            });
+        }
+
+        // â”€â”€ Real-Time Pickup Status Notification Poller â”€â”€
+        let notifiedOrderIds = new Set();
+        async function checkPickupOrdersStatus() {
+            try {
+                const res = await fetch("user_orders.php");
+                if (!res.ok) return;
+                const data = await res.json();
+                if (Array.isArray(data.orders)) {
+                    data.orders.forEach(order => {
+                        // If order is at this store, is a pickup order, and is ready
+                        if (String(order.store_id || "") === String(store.id) || order.store_name === store.name) {
+                            if (order.status === "for_pickup" || order.status === "ready" || order.status === "completed") {
+                                if (!notifiedOrderIds.has(order.id)) {
+                                    notifiedOrderIds.add(order.id);
+                                    showPickupToast(order.id, store.name);
+                                }
+                            }
+                        }
+                    });
+                }
+            } catch (err) {
+                // Ignore poll error
+            }
+        }
+
+        function showPickupToast(orderId, storeName) {
+            const container = document.getElementById("pickup-toast-container");
+            if (!container) return;
+            const toast = document.createElement("div");
+            toast.className = "pickup-live-toast";
+            toast.innerHTML = `
+                <div style="width:40px; height:40px; border-radius:10px; background:#10B981; color:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                </div>
+                <div style="flex:1;">
+                    <h5 style="margin:0; font-size:14px; color:#065F46; font-weight:800;">Order #${orderId} Ready!</h5>
+                    <p style="margin:2px 0 0; font-size:12.5px; color:#047857;">Available for pickup at ${escapeHtml(storeName)}</p>
+                </div>
+                <a href="order_history.php" style="padding:6px 12px; border-radius:8px; background:#059669; color:#fff; font-size:12px; font-weight:700; text-decoration:none;">View</a>
+                <button type="button" onclick="this.parentElement.remove()" style="background:none; border:none; color:#94A3B8; font-size:18px; cursor:pointer;">&times;</button>
+            `;
+            container.appendChild(toast);
+            setTimeout(() => { if (toast.parentElement) toast.remove(); }, 12000);
+        }
+
+        // Start periodic polling every 12 seconds
+        setInterval(checkPickupOrdersStatus, 12000);
+
         renderCart();
 
+        // â”€â”€ Map Initialization â”€â”€
         if (Number.isFinite(Number(store.lat)) && Number.isFinite(Number(store.lng))) {
             const map = L.map("public-store-map", { zoomControl: false }).setView([Number(store.lat), Number(store.lng)], 16);
             L.control.zoom({ position: "bottomright" }).addTo(map);
@@ -500,9 +904,9 @@ $storeForCart["products"] = $products;
                 iconAnchor: [17, 34],
                 popupAnchor: [0, -32]
             });
-            L.marker([Number(store.lat), Number(store.lng)], { icon: storeIcon }).addTo(map).bindPopup(store.name || "Store").openPopup();
+            L.marker([Number(store.lat), Number(store.lng)], { icon: storeIcon }).addTo(map).bindPopup(`<strong>${escapeHtml(store.name || "Store")}</strong><br>${escapeHtml(store.address || "")}`).openPopup();
         } else {
-            document.getElementById("public-store-map").innerHTML = "<p>Location not available.</p>";
+            document.getElementById("public-store-map").innerHTML = "<p style='padding:18px; color:#64748B;'>Store location coordinates not available.</p>";
         }
     </script>
 </body>

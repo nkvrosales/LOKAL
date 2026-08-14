@@ -23,6 +23,7 @@ if (is_logged_in()) {
 $errors = [];
 $email_value = "";
 $show_registered = isset($_GET["registered"]) && $_GET["registered"] === "1";
+$show_deleted = isset($_GET["deleted"]) && $_GET["deleted"] === "1";
 $first_name = "";
 $last_name = "";
 $account_type = "";
@@ -93,6 +94,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 </div>
                 <?php if ($show_registered): ?>
                     <div class="notice">Registration complete. Please sign in.</div>
+                <?php endif; ?>
+                <?php if ($show_deleted): ?>
+                    <div class="notice">Your account has been deleted successfully.</div>
                 <?php endif; ?>
                 <?php if ($errors): ?>
                     <div class="notice error">

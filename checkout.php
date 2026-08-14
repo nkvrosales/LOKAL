@@ -26,6 +26,10 @@ if (!is_array($payload)) {
 
 $items = $payload["items"] ?? [];
 $orderType = strtolower(trim((string) ($payload["order_type"] ?? "delivery")));
+$scheduledTime = trim((string) ($payload["scheduled_time"] ?? "ASAP"));
+if ($scheduledTime === "") {
+    $scheduledTime = "ASAP";
+}
 $deliveryLat = $payload["delivery_lat"] ?? null;
 $deliveryLng = $payload["delivery_lng"] ?? null;
 $deliveryFeePerKm = 40.0;
@@ -195,9 +199,9 @@ try {
     $createdOrderIds = [];
     $orderStmt = $mysqli->prepare(
         "INSERT INTO orders
-            (customer_user_id, store_user_id, status, order_type, customer_name, delivery_address, delivery_lat, delivery_lng,
+            (customer_user_id, store_user_id, status, order_type, scheduled_time, customer_name, delivery_address, delivery_lat, delivery_lng,
              store_name, store_address, store_lat, store_lng, subtotal_amount, delivery_fee, delivery_distance_km, total_amount)
-         VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+         VALUES (?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     );
     $itemStmt = $mysqli->prepare(
         "INSERT INTO order_items
@@ -233,10 +237,11 @@ try {
         $storeLatValue = $first["store_lat"];
         $storeLngValue = $first["store_lng"];
         $orderStmt->bind_param(
-            "iisssddssdddddd",
+            "iissssddssdddddd",
             $customerUserId,
             $storeUserIdValue,
             $orderType,
+            $scheduledTime,
             $customerName,
             $orderDeliveryAddress,
             $orderDeliveryLat,

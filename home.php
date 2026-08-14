@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 require_once "auth.php";
 require_once "db.php";
 require_login();
@@ -176,7 +176,7 @@ if (!$is_store) {
             ],
             [
                 "id" => "sample_2",
-                "name" => "Cozy Corner Café",
+                "name" => "Cozy Corner CafÃ©",
                 "address" => "303 Java Blvd, Springfield",
                 "lat" => 42.1015,
                 "lng" => -72.5898,
@@ -246,7 +246,7 @@ if (empty($sidebar_categories)) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Home | Lokal</title>
     <link rel="stylesheet" href="assets/styles.css?v=primary-bw-icons-1">
-    <link rel="stylesheet" href="assets/home.css?v=store-category-badge-1">
+    <link rel="stylesheet" href="assets/home.css?v=mobile-stores-btn-fix-2">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 </head>
 <body class="home-screen <?php echo $is_store ? "account-store" : "account-user"; ?>">
@@ -401,7 +401,7 @@ if (empty($sidebar_categories)) {
                     </a>
                     <a class="menu-link" href="store_products.php">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
-                        <span>Product</span>
+                        <span>Products</span>
                     </a>
                     <a class="menu-link" href="order_history.php">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
@@ -1525,6 +1525,20 @@ if (empty($sidebar_categories)) {
             if (sidebarExpandBtn) {
                 sidebarExpandBtn.addEventListener("click", expandSidebar);
             }
+
+            function checkResponsiveSidebar() {
+                if (window.innerWidth <= 768) {
+                    if (sidebarExpandBtn && (!storeSidebar || !storeSidebar.classList.contains("sidebar-open"))) {
+                        sidebarExpandBtn.hidden = false;
+                    }
+                } else {
+                    if (sidebarExpandBtn && !document.body.classList.contains("sidebar-collapsed")) {
+                        sidebarExpandBtn.hidden = true;
+                    }
+                }
+            }
+            checkResponsiveSidebar();
+            window.addEventListener("resize", checkResponsiveSidebar);
 
             renderSidebarStores();
         } else {

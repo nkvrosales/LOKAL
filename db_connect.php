@@ -126,6 +126,7 @@ function ensure_store_products_table(mysqli $mysqli): void
             product_description VARCHAR(255) DEFAULT NULL,
             product_image VARCHAR(255) DEFAULT NULL,
             product_price DECIMAL(10, 2) DEFAULT NULL,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             INDEX idx_store_products_store_user_id (store_user_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
@@ -133,6 +134,9 @@ function ensure_store_products_table(mysqli $mysqli): void
     $columns = get_table_columns($mysqli, "store_products");
     if (!isset($columns["product_image"])) {
         $mysqli->query("ALTER TABLE store_products ADD COLUMN product_image VARCHAR(255) DEFAULT NULL AFTER product_description");
+    }
+    if (!isset($columns["is_active"])) {
+        $mysqli->query("ALTER TABLE store_products ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1 AFTER product_price");
     }
 }
 
@@ -192,6 +196,7 @@ function ensure_orders_schema(mysqli $mysqli): void
     $columns = get_table_columns($mysqli, "orders");
     $columnStatements = [
         "order_type" => "ALTER TABLE orders ADD COLUMN order_type VARCHAR(20) NOT NULL DEFAULT 'delivery' AFTER status",
+        "scheduled_time" => "ALTER TABLE orders ADD COLUMN scheduled_time VARCHAR(80) DEFAULT 'ASAP' AFTER order_type",
         "subtotal_amount" => "ALTER TABLE orders ADD COLUMN subtotal_amount DECIMAL(10, 2) NOT NULL DEFAULT 0.00 AFTER store_lng",
         "delivery_fee" => "ALTER TABLE orders ADD COLUMN delivery_fee DECIMAL(10, 2) NOT NULL DEFAULT 0.00 AFTER subtotal_amount",
         "delivery_distance_km" => "ALTER TABLE orders ADD COLUMN delivery_distance_km DECIMAL(10, 2) NOT NULL DEFAULT 0.00 AFTER delivery_fee",

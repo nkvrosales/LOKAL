@@ -131,19 +131,108 @@ function load_account_profile(mysqli $mysqli, int $userId): array
 $profile = load_account_profile($mysqli, $userId);
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
-    foreach (["first_name", "middle_name", "last_name", "contact", "email"] as $field) {
-        $profile[$field] = trim($_POST[$field] ?? "");
-    }
+    // â”€â”€ Handle Account Deletion â”€â”€
+    if (isset($_POST["delete_account_submit"])) {
+        $delPassword = $_POST["delete_confirm_password"] ?? "";
+        if ($delPassword === "") {
+            $errors[] = "Password is required to delete your account.";
+        } else {
+            $stmt = $mysqli->prepare("SELECT password_hash, profile_image, id_image, orcr_image, account_type FROM users WHERE id = ? LIMIT 1");
+            if ($stmt) {
+                $stmt->bind_param("i", $userId);
+                $stmt->execute();
+                $stmt->bind_result($curHash, $pImg, $idImg, $orcrImg, $accType);
+                if ($stmt->fetch() && password_verify($delPassword, (string) $curHash)) {
+                    $stmt->close();
 
-    $currentPassword = $_POST["current_password"] ?? "";
-    $newPassword = $_POST["new_password"] ?? "";
-    $confirmPassword = $_POST["confirm_password"] ?? "";
-    $shouldChangePassword = $newPassword !== "" || $confirmPassword !== "";
+                    // Delete user files
+                    if (!empty($pImg) && file_exists(__DIR__ . "/uploads/profiles/" . $pImg)) {
+                        @unlink(__DIR__ . "/uploads/profiles/" . $pImg);
+                    }
+                    if (!empty($idImg) && file_exists(__DIR__ . "/uploads/ids/" . $idImg)) {
+                        @unlink(__DIR__ . "/uploads/ids/" . $idImg);
+                    }
+                    if (!empty($orcrImg) && file_exists(__DIR__ . "/uploads/orcr/" . $orcrImg)) {
+                        @unlink(__DIR__ . "/uploads/orcr/" . $orcrImg);
+                    }
 
-    if ($isStore) {
-        foreach (["store_name", "store_contact", "store_address", "store_lat", "store_lng", "store_category"] as $field) {
+                    // If store, remove products and images
+                    if ($accType === "store") {
+                        $pStmt = $mysqli->prepare("SELECT product_image FROM store_products WHERE store_user_id = ?");
+                        if ($pStmt) {
+                            $pStmt->bind_param("i", $userId);
+                            $pStmt->execute();
+                            $pStmt->bind_result($prodImg);
+                            while ($pStmt->fetch()) {
+                                if (!empty($prodImg) && file_exists(__DIR__ . "/uploads/products/" . $prodImg)) {
+                                    @unlink(__DIR__ . "/uploads/products/" . $prodImg);
+                                }
+                            }
+                            $pStmt->close();
+                        }
+                        $delP = $mysqli->prepare("DELETE FROM store_products WHERE store_user_id = ?");
+                        if ($delP) {
+                            $delP->bind_param("i", $userId);
+                            $delP->execute();
+                            $delP->close();
+                        }
+                    }
+
+                    // Delete order items and orders
+                    $delOi = $mysqli->prepare("DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE customer_user_id = ? OR store_user_id = ?)");
+                    if ($delOi) {
+                        $delOi->bind_param("ii", $userId, $userId);
+                        $delOi->execute();
+                        $delOi->close();
+                    }
+
+                    $delOrd = $mysqli->prepare("DELETE FROM orders WHERE customer_user_id = ? OR store_user_id = ?");
+                    if ($delOrd) {
+                        $delOrd->bind_param("ii", $userId, $userId);
+                        $delOrd->execute();
+                        $delOrd->close();
+                    }
+
+                    // Delete user record
+                    $delU = $mysqli->prepare("DELETE FROM users WHERE id = ? LIMIT 1");
+                    if ($delU) {
+                        $delU->bind_param("i", $userId);
+                        $delU->execute();
+                        $delU->close();
+                    }
+
+                    // Destroy session and redirect to login
+                    $_SESSION = [];
+                    if (ini_get("session.use_cookies")) {
+                        $params = session_get_cookie_params();
+                        setcookie(session_name(), '', time() - 42000, $params["path"], $params["domain"], $params["secure"], $params["httponly"]);
+                    }
+                    session_destroy();
+
+                    header("Location: login.php?deleted=1");
+                    exit;
+                } else {
+                    $stmt->close();
+                    $errors[] = "Incorrect password. Account deletion cancelled.";
+                }
+            } else {
+                $errors[] = "Unable to process account deletion.";
+            }
+        }
+    } else {
+        foreach (["first_name", "middle_name", "last_name", "contact", "email"] as $field) {
             $profile[$field] = trim($_POST[$field] ?? "");
         }
+
+        $currentPassword = $_POST["current_password"] ?? "";
+        $newPassword = $_POST["new_password"] ?? "";
+        $confirmPassword = $_POST["confirm_password"] ?? "";
+        $shouldChangePassword = $newPassword !== "" || $confirmPassword !== "";
+
+        if ($isStore) {
+            foreach (["store_name", "store_contact", "store_address", "store_lat", "store_lng", "store_category"] as $field) {
+                $profile[$field] = trim($_POST[$field] ?? "");
+            }
     } elseif ($isDriver) {
         $profile["vehicle_registration"] = trim($_POST["vehicle_registration"] ?? "");
     } else {
@@ -441,6 +530,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         }
     }
 }
+}
 
 $mapLat = $isStore ? $profile["store_lat"] : ($isDriver ? "" : $profile["user_lat"]);
 $mapLng = $isStore ? $profile["store_lng"] : ($isDriver ? "" : $profile["user_lng"]);
@@ -465,7 +555,7 @@ if ($isStore) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Account Profile | Lokal</title>
     <link rel="stylesheet" href="assets/styles.css?v=primary-bw-icons-1">
-    <link rel="stylesheet" href="assets/store-admin.css?v=hover-effects-1">
+    <link rel="stylesheet" href="assets/store-admin.css?v=mobile-responsive-profile-2">
     <?php if (!$isDriver): ?>
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
     <?php endif; ?>
@@ -651,6 +741,257 @@ if ($isStore) {
             display: block;
         }
         @keyframes spin { to { transform: translateY(-50%) rotate(360deg); } }
+
+        @media (max-width: 768px) {
+            .top-bar {
+                padding: 10px 14px;
+                flex-direction: column;
+                align-items: stretch;
+                gap: 8px;
+            }
+            .store-admin-nav {
+                border-radius: 12px;
+                padding: 3px;
+                gap: 3px;
+                overflow-x: auto;
+                flex-wrap: nowrap;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: none;
+                width: 100%;
+                box-sizing: border-box;
+            }
+            .store-admin-nav::-webkit-scrollbar {
+                display: none;
+            }
+            .store-admin-tab {
+                white-space: nowrap;
+                flex-shrink: 0;
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+            .store-admin-shell {
+                padding: 12px 10px;
+                width: 100%;
+                box-sizing: border-box;
+            }
+            .store-admin-card {
+                padding: 16px 14px;
+                border-radius: 16px;
+                width: 100%;
+                box-sizing: border-box;
+                overflow: hidden;
+            }
+            .store-admin-card h1 {
+                font-size: 22px;
+            }
+            .status-text {
+                font-size: 13px;
+                line-height: 1.4;
+            }
+            .profile-photo-upload-row {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+                padding: 12px;
+            }
+            .profile-photo-info {
+                width: 100%;
+                min-width: 0;
+            }
+            .profile-photo-info input[type="file"] {
+                width: 100%;
+                max-width: 100%;
+                box-sizing: border-box;
+                font-size: 12px;
+            }
+            .split {
+                grid-template-columns: 1fr !important;
+                gap: 10px;
+            }
+            .field {
+                width: 100%;
+                min-width: 0;
+                box-sizing: border-box;
+            }
+            .field input,
+            .field select,
+            .field textarea {
+                width: 100%;
+                max-width: 100%;
+                box-sizing: border-box;
+            }
+            .driver-doc-grid {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+            .form-stack .btn {
+                width: 100%;
+            }
+        }
+
+        /* Danger Zone */
+        .danger-zone-card {
+            margin-top: 36px;
+            border: 1.5px solid rgba(239, 68, 68, 0.25);
+            border-radius: 18px;
+            background: linear-gradient(135deg, rgba(254, 242, 242, 0.5) 0%, rgba(254, 242, 242, 0.2) 100%);
+            padding: 20px 22px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        .danger-zone-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .danger-zone-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            background: #FEE2E2;
+            color: #DC2626;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .danger-zone-header h3 {
+            margin: 0;
+            color: #991B1B;
+            font-size: 16px;
+            font-weight: 700;
+        }
+        .danger-zone-header p {
+            margin: 2px 0 0;
+            color: #7F1D1D;
+            font-size: 13px;
+        }
+        .danger-zone-body {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .danger-zone-body p {
+            margin: 0;
+            font-size: 13px;
+            color: #64748B;
+            line-height: 1.45;
+            max-width: 500px;
+        }
+        .btn-danger-outline {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 9px 18px;
+            border-radius: 12px;
+            border: 1.5px solid rgba(239, 68, 68, 0.45);
+            background: #FFFFFF;
+            color: #DC2626;
+            font: inherit;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+        .btn-danger-outline:hover {
+            background: #DC2626;
+            color: #FFFFFF;
+            border-color: #DC2626;
+            box-shadow: 0 4px 14px rgba(220, 38, 38, 0.25);
+            transform: translateY(-1px);
+        }
+
+        /* Modal Styles */
+        .pm-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,.45);
+            backdrop-filter: blur(3px);
+            z-index: 9000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .22s;
+        }
+        .pm-overlay.open { opacity: 1; pointer-events: all; }
+        .pm-box {
+            background: #fff;
+            border-radius: 22px;
+            box-shadow: 0 32px 80px rgba(0,0,0,.28);
+            width: min(500px, 100%);
+            max-height: 92vh;
+            overflow-y: auto;
+            transform: translateY(20px) scale(.97);
+            transition: transform .25s cubic-bezier(.16,1,.3,1);
+            padding: 28px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .pm-overlay.open .pm-box { transform: translateY(0) scale(1); }
+        .pm-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .pm-close {
+            width: 36px; height: 36px; border-radius: 10px; border: 1.5px solid #E2E8F0;
+            background: #F8FAFC; cursor: pointer; display: flex; align-items: center;
+            justify-content: center; font-size: 18px; color: #64748B; transition: all .15s;
+        }
+        .pm-close:hover { background: #FEE2E2; border-color: #FCA5A5; color: #DC2626; }
+        .pm-actions { display: flex; gap: 10px; justify-content: flex-end; padding-top: 4px; }
+        .pm-cancel {
+            padding: 10px 20px; border-radius: 12px; border: 1.5px solid #E2E8F0;
+            background: #F8FAFC; color: #475569; font: inherit; font-size: 13.5px;
+            font-weight: 600; cursor: pointer; transition: all .15s;
+        }
+        .pm-cancel:hover { background: #F1F5F9; }
+        .profile-map-wrapper {
+            position: relative;
+            width: 100%;
+            margin-top: 14px;
+            margin-bottom: 8px;
+        }
+        #profile-map {
+            height: 300px;
+            width: 100%;
+            border-radius: 14px;
+            overflow: hidden;
+            border: 1.5px solid #E2E8F0;
+            background: #e5e3df;
+            z-index: 1;
+        }
+        .map-floating-gps-btn {
+            position: absolute;
+            bottom: 14px;
+            right: 14px;
+            z-index: 1000;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: #FFFFFF;
+            border: 1.5px solid #E2E8F0;
+            color: #FF5B2E;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+        .map-floating-gps-btn:hover {
+            transform: scale(1.08);
+            background: #FFF5F2;
+            border-color: #FF5B2E;
+            box-shadow: 0 6px 18px rgba(255, 91, 46, 0.25);
+        }
+        .map-floating-gps-btn:active {
+            transform: scale(0.95);
+        }
     </style>
 </head>
 <body class="store-admin-body">
@@ -679,12 +1020,12 @@ if ($isStore) {
                 </a>
                 <a class="store-admin-tab" href="order_history.php">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                    <span>Order History</span>
+                    <span>Orders</span>
                 </a>
                 <?php if ($isStore): ?>
                     <a class="store-admin-tab" href="store_products.php">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
-                        <span>Product</span>
+                        <span>Products</span>
                     </a>
                 <?php else: ?>
                     <a class="store-admin-tab" href="cart.php">
@@ -707,9 +1048,9 @@ if ($isStore) {
 
             <?php if ($isDriver): ?>
                 <?php if ((int)$profile["is_approved"] === 1): ?>
-                    <div class="driver-status-badge approved">✓ Approved Delivery Rider</div>
+                    <div class="driver-status-badge approved">âœ“ Approved Delivery Rider</div>
                 <?php else: ?>
-                    <div class="driver-status-badge pending">⏳ Account Pending Admin Approval</div>
+                    <div class="driver-status-badge pending">â³ Account Pending Admin Approval</div>
                 <?php endif; ?>
             <?php endif; ?>
 
@@ -824,8 +1165,18 @@ if ($isStore) {
                         </select>
                     </div>
                     <div class="field">
-                        <label for="store_address">Store address</label>
-                        <input type="text" id="store_address" name="store_address" value="<?php echo escape($profile["store_address"]); ?>" required>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                            <label for="store_address" style="margin-bottom:0;">Store address</label>
+                            <button class="profile-location-btn" id="use-current-location-field-btn" type="button">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                                <span>Use current location</span>
+                            </button>
+                        </div>
+                        <div class="address-autofill-wrap">
+                            <input type="text" id="store_address" name="store_address" value="<?php echo escape($profile["store_address"]); ?>" placeholder="Start typing your store address…" autocomplete="off" required>
+                            <div class="address-autofill-spinner" id="addr-spinner"></div>
+                            <div class="address-suggestions" id="addr-suggestions" role="listbox" aria-label="Address suggestions"></div>
+                        </div>
                     </div>
                     <input type="hidden" id="map_lat" name="store_lat" value="<?php echo escape($profile["store_lat"]); ?>">
                     <input type="hidden" id="map_lng" name="store_lng" value="<?php echo escape($profile["store_lng"]); ?>">
@@ -840,8 +1191,8 @@ if ($isStore) {
                         </div>
                         <div class="address-autofill-wrap">
                             <input type="text" id="user_address" name="user_address" value="<?php echo escape($profile["user_address"]); ?>" placeholder="Start typing your delivery address…" autocomplete="off" required>
-                            <div class="address-autofill-spinner" id="user-addr-spinner"></div>
-                            <div class="address-suggestions" id="user-addr-suggestions" role="listbox" aria-label="Address suggestions"></div>
+                            <div class="address-autofill-spinner" id="addr-spinner"></div>
+                            <div class="address-suggestions" id="addr-suggestions" role="listbox" aria-label="Address suggestions"></div>
                         </div>
                     </div>
                     <input type="hidden" id="map_lat" name="user_lat" value="<?php echo escape($profile["user_lat"]); ?>">
@@ -849,12 +1200,17 @@ if ($isStore) {
                 <?php endif; ?>
 
                 <?php if (!$isDriver): ?>
-                    <div id="profile-map"></div>
+                    <div class="profile-map-wrapper">
+                        <div id="profile-map"></div>
+                        <button type="button" id="map-gps-btn" class="map-floating-gps-btn" title="Use current location (GPS)" aria-label="Center GPS location">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
+                        </button>
+                    </div>
                     <p class="store-pin-status" id="pin-status">
                         <?php if ($mapLat !== "" && $mapLng !== ""): ?>
                             Pinned at <?php echo escape($mapLat); ?>, <?php echo escape($mapLng); ?>.
                         <?php else: ?>
-                            No location pinned yet. Tap on the map to set it.
+                            No location pinned yet. Tap on the map or use the GPS button to set it.
                         <?php endif; ?>
                     </p>
                 <?php endif; ?>
@@ -877,8 +1233,60 @@ if ($isStore) {
 
                 <button class="btn" type="submit">Save Changes</button>
             </form>
+
+            <!-- Danger Zone: Delete Account -->
+            <div class="danger-zone-card">
+                <div class="danger-zone-header">
+                    <div class="danger-zone-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    </div>
+                    <div>
+                        <h3>Danger Zone</h3>
+                        <p>Permanently remove your account and all associated data.</p>
+                    </div>
+                </div>
+                <div class="danger-zone-body">
+                    <p>Once you delete your account, there is no going back. All your profile information, order history, and saved locations will be permanently removed.</p>
+                    <button type="button" class="btn-danger-outline" id="open-delete-account-modal">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+                        Delete Account
+                    </button>
+                </div>
+            </div>
         </section>
     </main>
+
+    <!-- DELETE ACCOUNT CONFIRMATION MODAL -->
+    <div class="pm-overlay" id="delete-account-overlay" role="dialog" aria-modal="true" aria-labelledby="delete-acc-title">
+        <div class="pm-box" style="max-width:440px;">
+            <div class="pm-head">
+                <h2 id="delete-acc-title" style="font-size:19px; color:#991B1B;">Delete Account</h2>
+                <button class="pm-close" id="close-delete-acc" type="button" aria-label="Close">&times;</button>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:12px;">
+                <div style="width:56px; height:56px; border-radius:16px; background:#FEE2E2; display:flex; align-items:center; justify-content:center; color:#DC2626;">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                </div>
+                <p style="margin:0; font-size:14px; color:#374151; line-height:1.5;">
+                    This action is <strong>permanent</strong> and cannot be undone. All your profile information, order history, and account access will be completely deleted.
+                </p>
+            </div>
+            <form method="post" id="delete-account-form" style="margin-top:8px;">
+                <input type="hidden" name="delete_account_submit" value="1">
+                <div class="field" style="margin-bottom:16px;">
+                    <label for="delete_confirm_password" style="font-weight:700; color:#1F2937;">Enter your password to confirm</label>
+                    <input type="password" id="delete_confirm_password" name="delete_confirm_password" placeholder="Current password" required autocomplete="current-password">
+                </div>
+                <div class="pm-actions">
+                    <button class="pm-cancel" type="button" id="cancel-delete-acc">Cancel</button>
+                    <button type="submit" style="padding:10px 22px; border-radius:12px; border:none; background:linear-gradient(135deg, #DC2626, #B91C1C); color:#fff; font:inherit; font-size:13.5px; font-weight:700; cursor:pointer; box-shadow:0 4px 12px rgba(220, 38, 38, 0.35); transition:all 0.2s; display:inline-flex; align-items:center; gap:6px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+                        Yes, Delete My Account
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <script>
         function previewProfilePhoto(event) {
@@ -900,15 +1308,65 @@ if ($isStore) {
                 reader.readAsDataURL(file);
             }
         }
+
+        // Delete Account Modal handlers
+        const deleteAccOverlay = document.getElementById("delete-account-overlay");
+        const openDeleteAccBtn = document.getElementById("open-delete-account-modal");
+        const closeDeleteAccBtn = document.getElementById("close-delete-acc");
+        const cancelDeleteAccBtn = document.getElementById("cancel-delete-acc");
+
+        function openDeleteAccModal() {
+            if (!deleteAccOverlay) return;
+            deleteAccOverlay.classList.add("open");
+            document.body.style.overflow = "hidden";
+            const pwdInput = document.getElementById("delete_confirm_password");
+            if (pwdInput) {
+                pwdInput.value = "";
+                setTimeout(() => pwdInput.focus(), 150);
+            }
+        }
+
+        function closeDeleteAccModal() {
+            if (!deleteAccOverlay) return;
+            deleteAccOverlay.classList.remove("open");
+            document.body.style.overflow = "";
+        }
+
+        if (openDeleteAccBtn) openDeleteAccBtn.addEventListener("click", openDeleteAccModal);
+        if (closeDeleteAccBtn) closeDeleteAccBtn.addEventListener("click", closeDeleteAccModal);
+        if (cancelDeleteAccBtn) cancelDeleteAccBtn.addEventListener("click", closeDeleteAccModal);
+        if (deleteAccOverlay) {
+            deleteAccOverlay.addEventListener("click", function(e) {
+                if (e.target === deleteAccOverlay) closeDeleteAccModal();
+            });
+        }
+
+        document.addEventListener("keydown", function(e) {
+            if (e.key === "Escape") closeDeleteAccModal();
+        });
     </script>
 
     <?php if (!$isDriver): ?>
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""></script>
         <script>
-            const map = L.map("profile-map", { zoomControl: true }).setView([14.5995, 120.9842], 12);
+            const map = L.map("profile-map", { zoomControl: true }).setView([14.5995, 120.9842], 13);
+            
             L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-                attribution: "&copy; OpenStreetMap contributors"
+                maxZoom: 19,
+                subdomains: ["a", "b", "c"],
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             }).addTo(map);
+
+            // Invalidate size repeatedly so tiles are always calculated and rendered cleanly
+            setTimeout(() => { map.invalidateSize(); }, 60);
+            setTimeout(() => { map.invalidateSize(); }, 200);
+            setTimeout(() => { map.invalidateSize(); }, 600);
+            setTimeout(() => { map.invalidateSize(); }, 1200);
+            window.addEventListener("resize", () => map.invalidateSize());
+            if (window.ResizeObserver) {
+                const mapEl = document.getElementById("profile-map");
+                if (mapEl) new ResizeObserver(() => map.invalidateSize()).observe(mapEl);
+            }
 
             const latInput = document.getElementById("map_lat");
             const lngInput = document.getElementById("map_lng");
@@ -925,17 +1383,18 @@ if ($isStore) {
                 } else {
                     marker = L.circleMarker([lat, lng], {
                         radius: 10,
-                        color: "#a80000",
-                        weight: 2,
-                        fillColor: "#f0c95d",
-                        fillOpacity: 0.95
+                        color: "#FF4D2E",
+                        weight: 3,
+                        fillColor: "#FFFFFF",
+                        fillOpacity: 1
                     }).addTo(map);
                 }
-                latInput.value = lat.toFixed(6);
-                lngInput.value = lng.toFixed(6);
-                pinStatus.textContent = `Pinned at ${latInput.value}, ${lngInput.value}.`;
+                if (latInput) latInput.value = lat.toFixed(6);
+                if (lngInput) lngInput.value = lng.toFixed(6);
+                if (pinStatus) pinStatus.textContent = `Pinned at ${lat.toFixed(6)}, ${lng.toFixed(6)}.`;
                 if (centerMap) {
-                    map.setView([lat, lng], 15);
+                    map.setView([lat, lng], 16);
+                    map.invalidateSize();
                 }
             }
 
@@ -967,23 +1426,27 @@ if ($isStore) {
                 }
 
                 const btnField = document.getElementById("use-current-location-field-btn");
+                const btnFloating = document.getElementById("map-gps-btn");
                 const iconHtml = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>';
 
                 if (btnField) { btnField.disabled = true; btnField.innerHTML = `<span>Locating…</span>`; }
-                if (pinStatus) pinStatus.textContent = "Getting your current location...";
+                if (btnFloating) { btnFloating.disabled = true; btnFloating.style.opacity = "0.5"; }
+                if (pinStatus) pinStatus.textContent = "Getting your current GPS location...";
 
                 navigator.geolocation.getCurrentPosition(
                     (position) => {
                         const lat = position.coords.latitude;
                         const lng = position.coords.longitude;
                         setPin(lat, lng, true);
-                        if (pinStatus) pinStatus.textContent = `Pinned from your current location at ${latInput.value}, ${lngInput.value}.`;
+                        if (pinStatus) pinStatus.textContent = `Pinned from your GPS location at ${lat.toFixed(6)}, ${lng.toFixed(6)}.`;
                         suggestAddressFromPin(lat, lng);
                         if (btnField) { btnField.disabled = false; btnField.innerHTML = `${iconHtml} <span>Use current location</span>`; }
+                        if (btnFloating) { btnFloating.disabled = false; btnFloating.style.opacity = "1"; }
                     },
                     () => {
-                        if (pinStatus) pinStatus.textContent = "Unable to access your current location. Allow location permission and try again.";
+                        if (pinStatus) pinStatus.textContent = "Unable to access your current location. Please allow location permissions in browser.";
                         if (btnField) { btnField.disabled = false; btnField.innerHTML = `${iconHtml} <span>Use current location</span>`; }
+                        if (btnFloating) { btnFloating.disabled = false; btnFloating.style.opacity = "1"; }
                     },
                     { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
                 );
@@ -996,14 +1459,19 @@ if ($isStore) {
             } else if ("geolocation" in navigator) {
                 navigator.geolocation.getCurrentPosition(
                     (position) => {
-                        map.setView([position.coords.latitude, position.coords.longitude], 14);
-                        if (pinStatus) pinStatus.textContent = "Current location found. Tap on map to pin exact delivery spot.";
+                        map.setView([position.coords.latitude, position.coords.longitude], 15);
+                        map.invalidateSize();
+                        if (pinStatus) pinStatus.textContent = "Location centered. Tap on map to drop a pin.";
                     },
-                    () => map.setView([14.5995, 120.9842], 12),
+                    () => {
+                        map.setView([14.5995, 120.9842], 12);
+                        map.invalidateSize();
+                    },
                     { enableHighAccuracy: true, timeout: 10000 }
                 );
             } else {
                 map.setView([14.5995, 120.9842], 12);
+                map.invalidateSize();
             }
 
             map.on("click", (event) => {
@@ -1016,11 +1484,19 @@ if ($isStore) {
                 fieldLocationButton.addEventListener("click", pinCurrentLocation);
             }
 
-            /* Address Autofill for user address */
+            const floatingGpsButton = document.getElementById("map-gps-btn");
+            if (floatingGpsButton) {
+                floatingGpsButton.addEventListener("click", (e) => {
+                    e.preventDefault();
+                    pinCurrentLocation();
+                });
+            }
+
+            /* Address Autofill for store/user address */
             (function () {
-                const addrInput   = document.getElementById("user_address");
-                const addrSugBox  = document.getElementById("user-addr-suggestions");
-                const addrSpinner = document.getElementById("user-addr-spinner");
+                const addrInput   = addressInput;
+                const addrSugBox  = document.getElementById("addr-suggestions");
+                const addrSpinner = document.getElementById("addr-spinner");
                 const addrLatInp  = document.getElementById("map_lat");
                 const addrLngInp  = document.getElementById("map_lng");
 
@@ -1034,8 +1510,8 @@ if ($isStore) {
 
                 function positionDropdown() {
                     const rect = addrInput.getBoundingClientRect();
-                    addrSugBox.style.top   = (rect.bottom + 4) + "px";
-                    addrSugBox.style.left  = rect.left + "px";
+                    addrSugBox.style.top   = (rect.bottom + window.scrollY + 4) + "px";
+                    addrSugBox.style.left  = (rect.left + window.scrollX) + "px";
                     addrSugBox.style.width = rect.width + "px";
                 }
 
@@ -1057,7 +1533,7 @@ if ($isStore) {
                     if (!results.length) {
                         const empty = document.createElement("div");
                         empty.className = "address-suggestion-item";
-                        empty.innerHTML = `<span class="sug-icon">⚠</span><span class="sug-text"><strong>No results found</strong><span>Try a more specific address</span></span>`;
+                        empty.innerHTML = `<span class="sug-icon">&#9888;</span><span class="sug-text"><strong>No results found</strong><span>Try a more specific address</span></span>`;
                         addrSugBox.appendChild(empty);
                     } else {
                         results.forEach((r, i) => {
@@ -1068,7 +1544,7 @@ if ($isStore) {
                             item.className  = "address-suggestion-item";
                             item.setAttribute("role", "option");
                             item.setAttribute("data-index", i);
-                            item.innerHTML  = `<span class="sug-icon">📍</span><span class="sug-text"><strong>${primary}</strong><span>${secondary}</span></span>`;
+                            item.innerHTML  = `<span class="sug-icon">&#128205;</span><span class="sug-text"><strong>${primary}</strong><span>${secondary}</span></span>`;
                             item.addEventListener("mousedown", (e) => {
                                 e.preventDefault();
                                 selectResult(i);
