@@ -202,10 +202,10 @@ function status_badge_info(string $s): array {
         border:1.5px solid #E2E8F0;
         border-radius:18px;
         overflow:hidden;
-        box-shadow:0 4px 16px rgba(0,0,0,.06);
-        transition:box-shadow .2s,transform .2s;
+        box-shadow:none;
+        transition:border-color .15s, filter .15s;
     }
-    .order-card:hover { box-shadow:0 8px 28px rgba(0,0,0,.10); transform:translateY(-1px); }
+    .order-card:hover { box-shadow:none; transform:none; filter:brightness(.98); border-color:#CBD5E1; }
 
     .order-card-head {
         display:flex; align-items:center; justify-content:space-between;
@@ -272,7 +272,7 @@ function status_badge_info(string $s): array {
         display:flex; flex-direction:column; gap:10px;
         margin:0 0 18px; padding:16px 18px; border:1px solid rgba(249,115,22,.25);
         background:linear-gradient(135deg, rgba(255,247,237,.95), rgba(254,215,170,.7));
-        border-radius:16px; box-shadow:0 10px 30px rgba(249,115,22,.08);
+        border-radius:16px; box-shadow:none;
     }
     .pickup-alert-item {
         display:flex; flex-direction:column; gap:2px; color:#7C2D12;
@@ -293,9 +293,9 @@ function status_badge_info(string $s): array {
         padding:8px 16px; border-radius:10px;
         font:inherit; font-size:12.5px; font-weight:700;
         cursor:pointer; border:1.5px solid;
-        transition:all .18s; white-space:nowrap;
+        transition:filter .15s; white-space:nowrap;
     }
-    .oab:hover { transform:translateY(-1px); filter:brightness(.92); }
+    .oab:hover { transform:none; filter:brightness(.92); }
     .oab:disabled { opacity:.5; cursor:not-allowed; transform:none; }
     .oab-reject  { background:rgba(239,68,68,.07);   border-color:rgba(239,68,68,.3);   color:#DC2626; }
     .oab-ready   { background:rgba(99,102,241,.08);  border-color:rgba(99,102,241,.35); color:#4338CA; }
@@ -308,13 +308,13 @@ function status_badge_info(string $s): array {
         padding:6px 16px; border-radius:999px;
         font:inherit; font-size:12.5px; font-weight:600;
         cursor:pointer; border:1.5px solid #E2E8F0;
-        background:#F8FAFC; color:#475569; transition:all .18s;
+        background:#F8FAFC; color:#475569; transition:background .15s, border-color .15s;
     }
     .filter-pill:hover { border-color:#CBD5E1; background:#F1F5F9; }
     .filter-pill.active {
         background:linear-gradient(135deg,#FF5B2E,#E04A1F);
         border-color:transparent; color:#fff;
-        box-shadow:0 4px 12px rgba(255,91,46,.3);
+        box-shadow:none;
     }
 
     .empty-state { text-align:center; padding:48px 0; color:#94A3B8; font-size:15px; }
@@ -322,18 +322,17 @@ function status_badge_info(string $s): array {
     /* Confirm overlay */
     .confirm-overlay {
         position:fixed; inset:0;
-        background:rgba(0,0,0,.45); backdrop-filter:blur(4px);
+        background:rgba(0,0,0,.45);
         z-index:9999; display:flex; align-items:center; justify-content:center;
-        padding:16px; opacity:0; pointer-events:none; transition:opacity .22s;
+        padding:16px; opacity:0; pointer-events:none; transition:opacity .15s;
     }
     .confirm-overlay.open { opacity:1; pointer-events:all; }
     .confirm-box {
         background:#fff; border-radius:20px;
-        box-shadow:0 32px 80px rgba(0,0,0,.28);
+        border:1px solid #CBD5E1;
+        box-shadow:none;
         width:min(420px,100%); padding:28px;
         display:flex; flex-direction:column; gap:16px;
-        transform:translateY(16px) scale(.97);
-        transition:transform .25s cubic-bezier(.16,1,.3,1);
     }
     .confirm-overlay.open .confirm-box { transform:none; }
     .confirm-box h3 { margin:0; font-size:18px; color:#0F172A; }
@@ -342,17 +341,17 @@ function status_badge_info(string $s): array {
     .btn-confirm-cancel {
         padding:9px 20px; border-radius:12px; border:1.5px solid #E2E8F0;
         background:#F8FAFC; color:#475569; font:inherit; font-size:13.5px;
-        font-weight:600; cursor:pointer; transition:all .15s;
+        font-weight:600; cursor:pointer; transition:background .15s;
     }
     .btn-confirm-cancel:hover { background:#F1F5F9; }
     .btn-confirm-ok {
         padding:9px 22px; border-radius:12px; border:none;
         background:linear-gradient(135deg,#FF5B2E,#E04A1F); color:#fff;
         font:inherit; font-size:13.5px; font-weight:700; cursor:pointer;
-        box-shadow:0 4px 12px rgba(255,91,46,.32); transition:all .2s;
+        box-shadow:none; transition:filter .15s;
     }
-    .btn-confirm-ok:hover { transform:translateY(-1px); box-shadow:0 6px 18px rgba(255,91,46,.42); }
-    .btn-confirm-ok.danger { background:linear-gradient(135deg,#EF4444,#DC2626); box-shadow:0 4px 12px rgba(239,68,68,.3); }
+    .btn-confirm-ok:hover { transform:none; filter:brightness(.92); box-shadow:none; }
+    .btn-confirm-ok.danger { background:linear-gradient(135deg,#EF4444,#DC2626); box-shadow:none; }
     </style>
 </head>
 <body class="store-admin-body">

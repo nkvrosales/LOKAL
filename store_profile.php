@@ -669,7 +669,7 @@ $storeForCart["products"] = $products;
                         </div>
                         <div style="display:flex; align-items:center; gap:8px;">
                             <div class="cart-item-stepper">
-                                <button type="button" class="cart-step-btn" data-cart-action="decrease" aria-label="Decrease quantity">âˆ’</button>
+                                <button type="button" class="cart-step-btn" data-cart-action="decrease" aria-label="Decrease quantity">&minus;</button>
                                 <span class="cart-step-val">${quantity}</span>
                                 <button type="button" class="cart-step-btn" data-cart-action="increase" aria-label="Increase quantity">+</button>
                             </div>
@@ -825,18 +825,6 @@ $storeForCart["products"] = $products;
             saveCart(items);
             renderCart();
             setStatus(`Added ${amount} × ${product.name || "Product"} to cart.`);
-
-            // Button feedback animation
-            const btn = document.querySelector(`[data-product-id="${productId}"]`);
-            if (btn) {
-                const origHtml = btn.innerHTML;
-                btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Added!`;
-                btn.style.background = "#10B981";
-                setTimeout(() => {
-                    btn.innerHTML = origHtml;
-                    btn.style.background = "";
-                }, 1200);
-            }
         }
 
         function updateCartItem(cartKey, nextQuantity) {

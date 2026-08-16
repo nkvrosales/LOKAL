@@ -339,16 +339,15 @@ $earnings = fetch_driver_earnings($conn);
             width: 380px;
             min-width: 380px;
             height: 100vh;
-            background: rgba(255, 255, 255, 0.98);
-            backdrop-filter: blur(24px);
+            background: #FFFFFF;
             border-right: 1px solid #E2E8F0;
             display: flex;
             flex-direction: column;
             z-index: 1000;
             flex-shrink: 0;
             box-sizing: border-box;
-            transition: margin-left 0.35s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-            box-shadow: 10px 0 30px rgba(15, 23, 42, 0.06);
+            transition: margin-left 0.25s ease;
+            box-shadow: none;
         }
 
         .sidebar-collapsed .driver-orders-sidebar {
@@ -594,15 +593,14 @@ $earnings = fetch_driver_earnings($conn);
             position: fixed;
             inset: 0;
             z-index: 99999;
-            background: rgba(15, 23, 42, 0.65);
-            backdrop-filter: blur(5px);
+            background: rgba(15, 23, 42, 0.5);
             display: flex;
             align-items: center;
             justify-content: center;
             padding: 20px;
             opacity: 0;
             pointer-events: none;
-            transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            transition: opacity 0.15s ease;
         }
 
         .driver-modal-backdrop.open {
@@ -613,20 +611,20 @@ $earnings = fetch_driver_earnings($conn);
         .driver-modal-card {
             background: #FFFFFF;
             border-radius: 22px;
+            border: 1px solid #CBD5E1;
             padding: 32px 26px 26px;
             width: 100%;
             max-width: 400px;
-            box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.3), 0 0 0 1px rgba(0, 0, 0, 0.06);
+            box-shadow: none;
             text-align: center;
-            transform: scale(0.92) translateY(12px);
-            transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            transform: none;
             display: flex;
             flex-direction: column;
             align-items: center;
         }
 
         .driver-modal-backdrop.open .driver-modal-card {
-            transform: scale(1) translateY(0);
+            transform: none;
         }
 
         .driver-modal-icon-wrap {

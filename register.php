@@ -325,12 +325,10 @@ if ($cat_res) {
 
         /* ── Left Side: Form Panel ── */
         .reg-card {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(24px);
-            -webkit-backdrop-filter: blur(24px);
+            background: #FFFFFF;
             border-radius: 20px;
-            border: 1px solid rgba(226, 232, 240, 0.8);
-            box-shadow: 0 16px 40px -8px rgba(15, 23, 42, 0.12);
+            border: 1px solid #CBD5E1;
+            box-shadow: none;
             padding: 20px 24px;
             display: flex;
             flex-direction: column;
@@ -601,12 +599,10 @@ if ($cat_res) {
 
         /* ── Right Side: Map & Live Context Panel (White Theme) ── */
         .reg-side-panel {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(24px);
-            -webkit-backdrop-filter: blur(24px);
+            background: #FFFFFF;
             border-radius: 20px;
-            border: 1px solid rgba(226, 232, 240, 0.8);
-            box-shadow: 0 16px 40px -8px rgba(15, 23, 42, 0.12);
+            border: 1px solid #CBD5E1;
+            box-shadow: none;
             padding: 20px 24px;
             display: flex;
             flex-direction: column;

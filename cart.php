@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once "auth.php";
 require_once "db.php";
 require_login();
@@ -442,7 +442,7 @@ if ($store_ids) {
                                     <em>${escapeHtml(lineTotal)}</em>
                                 </div>
                                 <div class="cart-qty-controls" aria-label="Quantity controls">
-                                    <button type="button" data-cart-action="decrease" aria-label="Decrease quantity" class="qty-btn qty-minus">−</button>
+                                    <button type="button" data-cart-action="decrease" aria-label="Decrease quantity" class="qty-btn qty-minus">&minus;</button>
                                     <span class="qty-display">${item.quantity}</span>
                                     <button type="button" data-cart-action="increase" aria-label="Increase quantity" class="qty-btn qty-plus">+</button>
                                 </div>

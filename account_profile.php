@@ -591,7 +591,7 @@ if ($isStore) {
             font-weight: 800;
             flex-shrink: 0;
             border: 3px solid #FFFFFF;
-            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+            box-shadow: none;
         }
         .profile-photo-preview-box img {
             width: 100%;
@@ -682,9 +682,9 @@ if ($isStore) {
         .address-suggestions {
             position: fixed;
             background: #fff;
-            border: 1px solid rgba(255,91,46,.28);
+            border: 1px solid #CBD5E1;
             border-radius: 10px;
-            box-shadow: 0 8px 28px rgba(0,0,0,.15);
+            box-shadow: none;
             z-index: 999999;
             overflow-y: auto;
             display: none;
@@ -900,15 +900,16 @@ if ($isStore) {
             font-size: 13px;
             font-weight: 700;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: filter 0.15s ease, background 0.15s ease;
             white-space: nowrap;
         }
         .btn-danger-outline:hover {
             background: #DC2626;
             color: #FFFFFF;
             border-color: #DC2626;
-            box-shadow: 0 4px 14px rgba(220, 38, 38, 0.25);
-            transform: translateY(-1px);
+            box-shadow: none;
+            transform: none;
+            filter: brightness(0.92);
         }
 
         /* Modal Styles */
@@ -916,7 +917,6 @@ if ($isStore) {
             position: fixed;
             inset: 0;
             background: rgba(0,0,0,.45);
-            backdrop-filter: blur(3px);
             z-index: 9000;
             display: flex;
             align-items: center;
@@ -924,36 +924,35 @@ if ($isStore) {
             padding: 16px;
             opacity: 0;
             pointer-events: none;
-            transition: opacity .22s;
+            transition: opacity .15s;
         }
         .pm-overlay.open { opacity: 1; pointer-events: all; }
         .pm-box {
             background: #fff;
             border-radius: 22px;
-            box-shadow: 0 32px 80px rgba(0,0,0,.28);
+            border: 1px solid #CBD5E1;
+            box-shadow: none;
             width: min(500px, 100%);
             max-height: 92vh;
             overflow-y: auto;
-            transform: translateY(20px) scale(.97);
-            transition: transform .25s cubic-bezier(.16,1,.3,1);
             padding: 28px;
             display: flex;
             flex-direction: column;
             gap: 16px;
         }
-        .pm-overlay.open .pm-box { transform: translateY(0) scale(1); }
+        .pm-overlay.open .pm-box { transform: none; }
         .pm-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
         .pm-close {
             width: 36px; height: 36px; border-radius: 10px; border: 1.5px solid #E2E8F0;
             background: #F8FAFC; cursor: pointer; display: flex; align-items: center;
-            justify-content: center; font-size: 18px; color: #64748B; transition: all .15s;
+            justify-content: center; font-size: 18px; color: #64748B; transition: background .15s, color .15s;
         }
         .pm-close:hover { background: #FEE2E2; border-color: #FCA5A5; color: #DC2626; }
         .pm-actions { display: flex; gap: 10px; justify-content: flex-end; padding-top: 4px; }
         .pm-cancel {
             padding: 10px 20px; border-radius: 12px; border: 1.5px solid #E2E8F0;
             background: #F8FAFC; color: #475569; font: inherit; font-size: 13.5px;
-            font-weight: 600; cursor: pointer; transition: all .15s;
+            font-weight: 600; cursor: pointer; transition: background .15s;
         }
         .pm-cancel:hover { background: #F1F5F9; }
         .profile-map-wrapper {
@@ -982,21 +981,23 @@ if ($isStore) {
             background: #FFFFFF;
             border: 1.5px solid #E2E8F0;
             color: #FF5B2E;
-            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+            box-shadow: none;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.2s ease;
+            transition: filter 0.15s ease, background 0.15s ease;
         }
         .map-floating-gps-btn:hover {
-            transform: scale(1.08);
+            transform: none;
             background: #FFF5F2;
             border-color: #FF5B2E;
-            box-shadow: 0 6px 18px rgba(255, 91, 46, 0.25);
+            filter: brightness(0.95);
+            box-shadow: none;
         }
         .map-floating-gps-btn:active {
-            transform: scale(0.95);
+            transform: none;
+            filter: brightness(0.85);
         }
     </style>
 </head>
@@ -1054,9 +1055,9 @@ if ($isStore) {
 
             <?php if ($isDriver): ?>
                 <?php if ((int)$profile["is_approved"] === 1): ?>
-                    <div class="driver-status-badge approved">âœ“ Approved Delivery Rider</div>
+                    <div class="driver-status-badge approved">&#10003; Approved Delivery Rider</div>
                 <?php else: ?>
-                    <div class="driver-status-badge pending">â³ Account Pending Admin Approval</div>
+                    <div class="driver-status-badge pending">&#9203; Account Pending Admin Approval</div>
                 <?php endif; ?>
             <?php endif; ?>
 
