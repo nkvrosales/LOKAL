@@ -16,13 +16,14 @@ $orders = [];
 
 $stmt = $mysqli->prepare(
     "SELECT id, store_name, store_address, store_lat, store_lng, delivery_address,
-            delivery_lat, delivery_lng, total_amount, status, created_at, accepted_at, pickup_at
+            delivery_lat, delivery_lng, total_amount, status, order_type, scheduled_time,
+            created_at, accepted_at, pickup_at
      FROM orders
      WHERE customer_user_id = ?
-       AND order_type = 'delivery'
-       AND status IN ('pending', 'for_pickup', 'delivering')
+       AND order_type IN ('delivery', 'pickup')
+       AND status IN ('pending', 'for_pickup', 'ready_for_pickup', 'delivering', 'completed')
      ORDER BY created_at DESC
-     LIMIT 10"
+     LIMIT 20"
 );
 
 if ($stmt) {
@@ -39,6 +40,8 @@ if ($stmt) {
         $deliveryLng,
         $totalAmount,
         $status,
+        $orderType,
+        $scheduledTime,
         $createdAt,
         $acceptedAt,
         $pickupAt
@@ -55,6 +58,8 @@ if ($stmt) {
             "delivery_lng" => $deliveryLng !== null ? (float) $deliveryLng : null,
             "total_amount" => $totalAmount !== null ? (float) $totalAmount : 0,
             "status" => (string) ($status ?? "pending"),
+            "order_type" => (string) ($orderType ?? "delivery"),
+            "scheduled_time" => (string) ($scheduledTime ?? "ASAP"),
             "created_at" => (string) ($createdAt ?? ""),
             "accepted_at" => (string) ($acceptedAt ?? ""),
             "pickup_at" => (string) ($pickupAt ?? ""),

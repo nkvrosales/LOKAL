@@ -578,33 +578,32 @@ body.store-admin-body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 12px;
 }
 
 .public-qty-label {
   display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  color: #64748B;
+  align-items: center;
+  gap: 8px;
+  color: #475569;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .public-qty-controls {
   display: inline-flex;
   align-items: center;
-  gap: 0;
-  padding: 0;
-  border: 1.5px solid #E2E8F0;
+  border: 1px solid #E2E8F0;
   border-radius: 10px;
-  background: #F8FAFC;
-  transition: border-color 0.15s ease;
+  background: #FFFFFF;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .public-qty-label:focus-within .public-qty-controls {
   border-color: #FF5B2E;
-  background: #FFFFFF;
+  box-shadow: 0 0 0 3px rgba(255, 91, 46, 0.08);
 }
 
 .public-qty-btn {
@@ -612,30 +611,38 @@ body.store-admin-body {
   height: 32px;
   border: 0;
   padding: 0;
-  background: transparent;
-  color: #FF5B2E;
+  background: #F8FAFC;
+  color: #0F172A;
   font: inherit;
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 22px;
+  font-weight: 500;
   line-height: 1;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .public-qty-btn:hover {
-  background-color: rgba(255, 91, 46, 0.08);
-  color: #FF5B2E;
+  background: #F1F5F9;
 }
 
 .public-qty-btn:active {
-  background-color: rgba(255, 91, 46, 0.15);
+  background: #E2E8F0;
+}
+
+.public-qty-btn.minus {
+  border-right: 1px solid #E2E8F0;
+}
+
+.public-qty-btn.plus {
+  border-left: 1px solid #E2E8F0;
 }
 
 .public-qty-label input {
-  width: 36px;
+  width: 46px;
   height: 32px;
   min-width: 0;
   border: 0;
@@ -643,10 +650,44 @@ body.store-admin-body {
   color: #0F172A;
   font: inherit;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 800;
   text-align: center;
   outline: none;
   background: transparent;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.public-qty-label input::-webkit-outer-spin-button,
+.public-qty-label input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+@media (max-width: 480px) {
+  .public-add-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .public-qty-label {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .public-qty-controls {
+    min-width: 120px;
+  }
+
+  .public-qty-btn {
+    width: 36px;
+    height: 36px;
+  }
+
+  .public-qty-label input {
+    width: 50px;
+    height: 36px;
+  }
 }
 
 .public-add-btn {

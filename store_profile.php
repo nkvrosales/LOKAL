@@ -197,7 +197,7 @@ $storeForCart["products"] = $products;
                     </div>
                     <div class="pickup-banner-text">
                         <h4>Your Order #<?php echo $activeReadyOrder["id"]; ?> is Ready for Pickup!</h4>
-                        <p>Your order at <strong><?php echo escape($store["name"]); ?></strong> is prepared. Please visit the store counter to pick it up. (Time: <?php echo escape($activeReadyOrder["scheduled_time"]); ?>)</p>
+                        <p>Your order at <strong><?php echo escape($store["name"]); ?></strong> is prepared. Please visit the store counter to pick it up. Pickup time: <?php echo escape($activeReadyOrder["scheduled_time"]); ?>. Grace period: 15-30 minutes.</p>
                     </div>
                 </div>
                 <div class="pickup-banner-actions">

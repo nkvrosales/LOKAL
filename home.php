@@ -850,7 +850,17 @@ if (empty($sidebar_categories)) {
                 }
             }
 
-            function formatOrderStatus(status) {
+            function formatOrderStatus(status, orderType = "delivery") {
+                if (orderType === "pickup") {
+                    return {
+                        pending: "Waiting for store confirmation",
+                        ready_for_pickup: "Ready for pickup",
+                        for_pickup: "Ready for pickup",
+                        delivering: "Pickup is being prepared",
+                        completed: "Picked up"
+                    }[status] || status;
+                }
+
                 return {
                     pending: "Waiting for rider",
                     for_pickup: "Rider is going to the store",
@@ -948,12 +958,14 @@ if (empty($sidebar_categories)) {
                     const items = Array.isArray(order.items) ? order.items : [];
                     const lines = items.map((item) => `<p>${escapeHtml(item.product_name)} x ${Number(item.quantity || 0)}</p>`).join("");
                     const total = order.total_amount != null ? formatCartPrice(order.total_amount) : "";
+                    const pickupTimeText = order.order_type === "pickup" && order.scheduled_time ? `\n                                <p>Pickup time: ${escapeHtml(order.scheduled_time)}</p>` : "";
                     return `<article class="order-tracker-card ${activeTrackedOrderId === order.id ? "active" : ""}" data-order-id="${order.id}">
                                 <div class="order-tracker-card-head">
                                     <strong>Order #${order.id}</strong>
-                                    <span>${escapeHtml(formatOrderStatus(order.status))}</span>
+                                    <span>${escapeHtml(formatOrderStatus(order.status, order.order_type))}</span>
                                 </div>
                                 <p>Store: ${escapeHtml(order.store_name || "Store")}</p>
+                                ${pickupTimeText}
                                 <div class="order-tracker-items">${lines || "<p>No items listed.</p>"}</div>
                                 ${total ? `<p><strong>${total}</strong></p>` : ""}
                             </article>`;
@@ -969,7 +981,12 @@ if (empty($sidebar_categories)) {
                     drawCustomerDeliveryRoute(tracked, payload.driver);
                 } else {
                     clearCustomerRoute();
-                    setStatus(formatOrderStatus(tracked.status));
+                    if (tracked.order_type === "pickup") {
+                        const pickupMessage = tracked.scheduled_time ? `Pickup scheduled for ${tracked.scheduled_time} (grace: 15-30 mins).` : "Pickup order is ready.";
+                        setStatus(pickupMessage);
+                    } else {
+                        setStatus(formatOrderStatus(tracked.status));
+                    }
                 }
             }
 
@@ -1052,10 +1069,9 @@ if (empty($sidebar_categories)) {
                                     <em>${escapeHtml(lineTotal)}</em>
                                 </div>
                                 <div class="cart-qty-controls" aria-label="Quantity controls">
-                                    <button type="button" data-cart-action="decrease" aria-label="Decrease quantity">-</button>
-                                    <span>${item.quantity}</span>
-                                    <button type="button" data-cart-action="increase" aria-label="Increase quantity">+</button>
-                                    <button type="button" data-cart-action="remove" aria-label="Remove item">Remove</button>
+                                    <button type="button" data-cart-action="decrease" aria-label="Decrease quantity" class="qty-btn qty-minus">−</button>
+                                    <span class="qty-display">${item.quantity}</span>
+                                    <button type="button" data-cart-action="increase" aria-label="Increase quantity" class="qty-btn qty-plus">+</button>
                                 </div>
                             </article>`;
                 }).join("");

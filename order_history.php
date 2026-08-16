@@ -122,6 +122,15 @@ if ($orders) {
 
 function fmt_money(float $a): string { return "PHP " . number_format($a, 2); }
 
+function pickup_grace_label(string $scheduledTime): string {
+    $value = trim($scheduledTime);
+    if ($value === "" || strtoupper($value) === "ASAP") {
+        return "Grace: 15-30 mins";
+    }
+
+    return "Pickup time: " . $value . " • Grace: 15-30 mins";
+}
+
 function status_badge_info(string $s): array {
     $m = [
         "pending"          => ["Pending",           "sb-pending"],
@@ -222,6 +231,19 @@ function status_badge_info(string $s): array {
     /* Timestamps */
     .order-times { display:flex; flex-wrap:wrap; gap:8px 18px; font-size:11.5px; color:#94A3B8; padding-top:2px; }
     .order-times b { color:#475569; }
+    .pickup-grace { color:#C2410C; font-weight:700; }
+    .pickup-alert-banner {
+        display:flex; flex-direction:column; gap:10px;
+        margin:0 0 18px; padding:16px 18px; border:1px solid rgba(249,115,22,.25);
+        background:linear-gradient(135deg, rgba(255,247,237,.95), rgba(254,215,170,.7));
+        border-radius:16px; box-shadow:0 10px 30px rgba(249,115,22,.08);
+    }
+    .pickup-alert-item {
+        display:flex; flex-direction:column; gap:2px; color:#7C2D12;
+        font-size:13px;
+    }
+    .pickup-alert-item strong { font-size:14px; }
+    .pickup-alert-item small { font-size:11px; opacity:.9; }
 
     /* Actions bar */
     .order-actions {
@@ -342,6 +364,29 @@ function status_badge_info(string $s): array {
                 </div>
             </div>
 
+            <?php if ($isStore): ?>
+                <?php
+                $pickupAlerts = [];
+                foreach ($orders as $order) {
+                    if (($order["order_type"] ?? "delivery") === "pickup" && in_array($order["status"], ["pending", "ready_for_pickup", "for_pickup"], true)) {
+                        $pickupAlerts[] = $order;
+                    }
+                }
+                ?>
+                <?php if ($pickupAlerts): ?>
+                    <div class="pickup-alert-banner">
+                        <?php foreach ($pickupAlerts as $alert): ?>
+                            <?php $pickupTime = $alert["scheduled_time"] !== "" ? $alert["scheduled_time"] : "ASAP"; ?>
+                            <div class="pickup-alert-item">
+                                <strong>Pickup order #<?php echo (int) $alert["id"]; ?></strong>
+                                <span>Customer pickup time: <?php echo escape($pickupTime); ?></span>
+                                <small>Grace period: 15-30 mins</small>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            <?php endif; ?>
+
             <?php if (!$orders): ?>
                 <div class="empty-state">
                     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="display:block;margin:0 auto 12px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
@@ -396,12 +441,24 @@ function status_badge_info(string $s): array {
                                     <div class="info-label"><?php echo $isPickup ? "Pickup at" : "Deliver to"; ?></div>
                                     <div class="info-value"><?php echo escape($isPickup ? ($order["store_address"] ?: "Store") : ($order["delivery_address"] ?: "Address not available")); ?></div>
                                 </div>
+                                <?php if ($isPickup): ?>
+                                    <div>
+                                        <div class="info-label">Pickup time</div>
+                                        <div class="info-value"><?php echo escape($sTime); ?> <span class="pickup-grace"><?php echo escape(pickup_grace_label($sTime)); ?></span></div>
+                                    </div>
+                                <?php endif; ?>
                             <?php else: ?>
                                 <div><div class="info-label">Store</div><div class="info-value"><?php echo escape($order["store_name"]); ?></div></div>
                                 <div>
                                     <div class="info-label"><?php echo $isPickup ? "Pickup at" : "Delivery address"; ?></div>
                                     <div class="info-value"><?php echo escape($isPickup ? ($order["store_address"] ?: "Store address") : ($order["delivery_address"] ?: "Not available")); ?></div>
                                 </div>
+                                <?php if ($isPickup): ?>
+                                    <div>
+                                        <div class="info-label">Pickup time</div>
+                                        <div class="info-value"><?php echo escape($sTime); ?> <span class="pickup-grace"><?php echo escape(pickup_grace_label($sTime)); ?></span></div>
+                                    </div>
+                                <?php endif; ?>
                             <?php endif; ?>
                         </div>
 
