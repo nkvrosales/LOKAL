@@ -854,8 +854,8 @@ if (empty($sidebar_categories)) {
                 if (orderType === "pickup") {
                     return {
                         pending: "Waiting for store confirmation",
-                        ready_for_pickup: "Ready for pickup",
-                        for_pickup: "Ready for pickup",
+                        ready_for_pickup: "Ready to pickup",
+                        for_pickup: "Ready to pickup",
                         delivering: "Pickup is being prepared",
                         completed: "Picked up"
                     }[status] || status;
@@ -982,7 +982,9 @@ if (empty($sidebar_categories)) {
                 } else {
                     clearCustomerRoute();
                     if (tracked.order_type === "pickup") {
-                        const pickupMessage = tracked.scheduled_time ? `Pickup scheduled for ${tracked.scheduled_time} (grace: 15-30 mins).` : "Pickup order is ready.";
+                        const pickupMessage = tracked.scheduled_time
+                            ? `Pickup scheduled for ${tracked.scheduled_time}; grace starts at the chosen pickup time and lasts 15-30 mins.`
+                            : "Pickup order is ready.";
                         setStatus(pickupMessage);
                     } else {
                         setStatus(formatOrderStatus(tracked.status));

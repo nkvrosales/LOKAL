@@ -16,11 +16,107 @@ $format_price_label = static function ($price): string {
     return "PHP " . number_format((float) $price, 2);
 };
 
+function store_hours_status(string $hours): string {
+    $value = trim($hours);
+    if ($value === "") {
+        return "Closed now";
+    }
+
+    if (stripos($value, "24/7") !== false || stripos($value, "24 hours") !== false) {
+        return "Open now";
+    }
+
+    $days = [
+        "sun" => 0,
+        "mon" => 1,
+        "tue" => 2,
+        "wed" => 3,
+        "thu" => 4,
+        "fri" => 5,
+        "sat" => 6,
+    ];
+
+    $normalizeDay = static function (string $token): int {
+        $token = strtolower(substr(trim($token), 0, 3));
+        return $days[$token] ?? 0;
+    };
+
+    $normalizeMinutes = static function (int $hour, int $minute): int {
+        $hour = max(0, min(23, $hour));
+        $minute = max(0, min(59, $minute));
+        return ($hour * 60) + $minute;
+    };
+
+    $matches = [];
+    preg_match_all(
+        '/((?:mon|tue|wed|thu|fri|sat|sun))\s*(?:-\s*((?:mon|tue|wed|thu|fri|sat|sun)))?\s*,?\s*([0-9]{1,2})(?::([0-9]{2}))?\s*(am|pm)\s*-\s*([0-9]{1,2})(?::([0-9]{2}))?\s*(am|pm)/i',
+        $value,
+        $matches,
+        PREG_SET_ORDER
+    );
+
+    $now = new DateTimeImmutable('now');
+    $nowMinutes = $normalizeMinutes((int) $now->format('G'), (int) $now->format('i'));
+    $currentDay = (int) $now->format('w');
+    $currentDay = $currentDay === 0 ? 0 : $currentDay; // Sunday => 0
+
+    foreach ($matches as $match) {
+        $startDay = $normalizeDay($match[1]);
+        $endDay = isset($match[2]) && trim($match[2]) !== '' ? $normalizeDay($match[2]) : $startDay;
+        $startHour = (int) $match[3];
+        $startMinute = (int) ($match[4] ?? 0);
+        $endHour = (int) $match[5];
+        $endMinute = (int) ($match[6] ?? 0);
+        $startMeridiem = strtolower($match[7]);
+        $endMeridiem = strtolower($match[8]);
+
+        if (strtolower($startMeridiem) === 'pm' && $startHour < 12) {
+            $startHour += 12;
+        }
+        if (strtolower($startMeridiem) === 'am' && $startHour === 12) {
+            $startHour = 0;
+        }
+        if (strtolower($endMeridiem) === 'pm' && $endHour < 12) {
+            $endHour += 12;
+        }
+        if (strtolower($endMeridiem) === 'am' && $endHour === 12) {
+            $endHour = 0;
+        }
+
+        $startMinutes = $normalizeMinutes($startHour, $startMinute);
+        $endMinutes = $normalizeMinutes($endHour, $endMinute);
+
+        $inRange = false;
+        $daySpan = $endDay - $startDay;
+        if ($daySpan >= 0) {
+            $inRange = $currentDay >= $startDay && $currentDay <= $endDay;
+        } else {
+            $inRange = $currentDay >= $startDay || $currentDay <= $endDay;
+        }
+
+        if (!$inRange) {
+            continue;
+        }
+
+        if ($endMinutes < $startMinutes) {
+            $inRange = ($nowMinutes >= $startMinutes || $nowMinutes <= $endMinutes);
+        } else {
+            $inRange = $nowMinutes >= $startMinutes && $nowMinutes <= $endMinutes;
+        }
+
+        if ($inRange) {
+            return "Open now";
+        }
+    }
+
+    return "Closed now";
+}
+
 $store = null;
 $products = [];
 
 $stmt = $mysqli->prepare(
-    "SELECT id, store_name, first_name, last_name, store_address, store_lat, store_lng, store_contact, contact, email, store_category, profile_image
+    "SELECT id, store_name, first_name, last_name, store_address, store_lat, store_lng, store_contact, contact, email, store_hours, store_category, profile_image
      FROM users
      WHERE id = ?
        AND account_type = 'store'
@@ -40,6 +136,7 @@ if ($stmt) {
         $storeContact,
         $defaultContact,
         $email,
+        $storeHours,
         $storeCategory,
         $profileImage
     );
@@ -62,6 +159,7 @@ if ($stmt) {
             "lng" => $storeLng !== null ? (float) $storeLng : null,
             "contact" => $displayContact,
             "email" => (string) ($email ?? ""),
+            "hours" => trim((string) ($storeHours ?? "")),
             "category" => (string) ($storeCategory ?? "Store"),
             "profile_image" => (string) ($profileImage ?? ""),
         ];
@@ -196,8 +294,8 @@ $storeForCart["products"] = $products;
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
                     </div>
                     <div class="pickup-banner-text">
-                        <h4>Your Order #<?php echo $activeReadyOrder["id"]; ?> is Ready for Pickup!</h4>
-                        <p>Your order at <strong><?php echo escape($store["name"]); ?></strong> is prepared. Please visit the store counter to pick it up. Pickup time: <?php echo escape($activeReadyOrder["scheduled_time"]); ?>. Grace period: 15-30 minutes.</p>
+                        <h4>Your Order #<?php echo $activeReadyOrder["id"]; ?> is Ready to Pickup!</h4>
+                        <p>Your order at <strong><?php echo escape($store["name"]); ?></strong> is prepared. Please visit the store counter to pick it up. Pickup time: <?php echo escape($activeReadyOrder["scheduled_time"]); ?>. Grace period starts at the chosen pickup time and lasts 15-30 minutes.</p>
                     </div>
                 </div>
                 <div class="pickup-banner-actions">
@@ -228,7 +326,9 @@ $storeForCart["products"] = $products;
                     </h1>
                     <div class="store-hero-badges">
                         <span class="store-badge-cat"><?php echo escape($store["category"]); ?></span>
-                        <span class="store-badge-open">Open for Orders</span>
+                        <span class="store-badge-open" style="background:<?php echo store_hours_status($store["hours"]) === "Open now" ? '#DCFCE7;color:#166534;' : '#FEE2E2;color:#991B1B;'; ?>; border:1px solid <?php echo store_hours_status($store["hours"]) === "Open now" ? '#86EFAC' : '#FCA5A5'; ?>;">
+                            <?php echo store_hours_status($store["hours"]) === "Open now" ? "Open now" : "Closed now"; ?>
+                        </span>
                     </div>
                     <p class="store-hero-address">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
@@ -258,6 +358,7 @@ $storeForCart["products"] = $products;
                 <h2>Store Information</h2>
                 <div style="display:flex; flex-direction:column; gap:10px; margin-top:10px;">
                     <p style="margin:0;"><strong>Available Products:</strong> <?php echo count($products); ?> items</p>
+                    <p style="margin:0;"><strong>Store Hours:</strong> <?php echo escape($store["hours"] !== "" ? $store["hours"] : "Not set yet"); ?></p>
                     <p style="margin:0;"><strong>Service Options:</strong> Delivery (PHP 40.00) &amp; Store Pickup (Free)</p>
                     <p style="margin:0;"><strong>Order Schedule:</strong> ASAP (20-35 mins) or Scheduled Time Slot</p>
                     <p style="margin:0;"><strong>Location:</strong> <?php echo escape($store["address"] !== "" ? $store["address"] : "Not listed"); ?></p>

@@ -28,6 +28,7 @@ $profile = [
     "store_address"         => "",
     "store_lat"             => "",
     "store_lng"             => "",
+    "store_hours"           => "",
     "store_category"        => "",
     "vehicle_registration"  => "",
     "id_image"              => "",
@@ -53,6 +54,7 @@ function load_account_profile(mysqli $mysqli, int $userId): array
         "store_address"         => "",
         "store_lat"             => "",
         "store_lng"             => "",
+        "store_hours"           => "",
         "store_category"        => "",
         "vehicle_registration"  => "",
         "id_image"              => "",
@@ -65,7 +67,7 @@ function load_account_profile(mysqli $mysqli, int $userId): array
     $stmt = $mysqli->prepare(
         "SELECT first_name, middle_name, last_name, contact, email,
                 user_address, user_lat, user_lng,
-                store_name, store_contact, store_address, store_lat, store_lng, store_category,
+                store_name, store_contact, store_address, store_lat, store_lng, store_hours, store_category,
                 vehicle_registration, id_image, orcr_image, profile_image, is_approved, created_at
          FROM users
          WHERE id = ?
@@ -91,6 +93,7 @@ function load_account_profile(mysqli $mysqli, int $userId): array
         $storeAddress,
         $storeLat,
         $storeLng,
+        $storeHours,
         $storeCategory,
         $vehicleReg,
         $idImage,
@@ -114,6 +117,7 @@ function load_account_profile(mysqli $mysqli, int $userId): array
             "store_address"         => trim((string) ($storeAddress ?? "")),
             "store_lat"             => $storeLat !== null ? (string) $storeLat : "",
             "store_lng"             => $storeLng !== null ? (string) $storeLng : "",
+            "store_hours"           => trim((string) ($storeHours ?? "")),
             "store_category"        => trim((string) ($storeCategory ?? "")),
             "vehicle_registration"  => trim((string) ($vehicleReg ?? "")),
             "id_image"              => trim((string) ($idImage ?? "")),
@@ -261,8 +265,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     }
 
     if ($isStore) {
-        if ($profile["store_name"] === "" || $profile["store_contact"] === "" || $profile["store_address"] === "") {
-            $errors[] = "Store name, contact, and address are required.";
+        if ($profile["store_name"] === "" || $profile["store_contact"] === "" || $profile["store_address"] === "" || $profile["store_hours"] === "") {
+            $errors[] = "Store name, contact, address, and hours are required.";
         }
         if ($profile["store_lat"] === "" || $profile["store_lng"] === "" || !is_numeric($profile["store_lat"]) || !is_numeric($profile["store_lng"])) {
             $errors[] = "Pin a valid store location on the map.";
@@ -391,7 +395,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 "UPDATE users
                  SET first_name = ?, middle_name = ?, last_name = ?, contact = ?, email = ?,
                      store_name = ?, store_contact = ?, store_address = ?, store_lat = ?, store_lng = ?,
-                     store_category = ?, profile_image = ?
+                     store_hours = ?, store_category = ?, profile_image = ?
                      {$passwordSql}
                  WHERE id = ?"
             );
@@ -409,6 +413,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         $profile["store_address"],
                         $lat,
                         $lng,
+                        $profile["store_hours"],
                         $storeCat,
                         $newProfileImage,
                         $newHash,
@@ -416,7 +421,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     );
                 } else {
                     $stmt->bind_param(
-                        "ssssssssddssi",
+                        "ssssssssddsssi",
                         $profile["first_name"],
                         $profile["middle_name"],
                         $profile["last_name"],
@@ -427,6 +432,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         $profile["store_address"],
                         $lat,
                         $lng,
+                        $profile["store_hours"],
                         $storeCat,
                         $newProfileImage,
                         $userId
@@ -1177,6 +1183,10 @@ if ($isStore) {
                             <div class="address-autofill-spinner" id="addr-spinner"></div>
                             <div class="address-suggestions" id="addr-suggestions" role="listbox" aria-label="Address suggestions"></div>
                         </div>
+                    </div>
+                    <div class="field">
+                        <label for="store_hours">Store hours</label>
+                        <input type="text" id="store_hours" name="store_hours" value="<?php echo escape($profile["store_hours"]); ?>" placeholder="e.g. Mon-Sun, 8:00 AM - 9:00 PM" required>
                     </div>
                     <input type="hidden" id="map_lat" name="store_lat" value="<?php echo escape($profile["store_lat"]); ?>">
                     <input type="hidden" id="map_lng" name="store_lng" value="<?php echo escape($profile["store_lng"]); ?>">

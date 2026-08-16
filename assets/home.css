@@ -536,12 +536,39 @@ body.home-screen::before {
 }
 
 .add-to-cart-controls {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: wrap;
   flex-shrink: 0;
+}
+
+.add-to-cart-controls button {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 12px;
+  background: #FF5B2E;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(255, 91, 46, 0.2);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.add-to-cart-controls button:hover {
+  background: #e84a1e;
+  box-shadow: 0 4px 12px rgba(255, 91, 46, 0.3);
+  transform: translateY(-2px);
+}
+
+.add-to-cart-controls button:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgba(255, 91, 46, 0.2);
 }
 
 .search-product-actions button {
@@ -2457,6 +2484,15 @@ body.menu-open .menu-backdrop {
     font-size: 18px;
   }
 
+  .add-to-cart-controls {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .add-to-cart-controls button {
+    width: 100%;
+  }
+
   .checkout-breakdown p,
   .cart-foot {
     display: grid;
@@ -2477,25 +2513,47 @@ body.menu-open .menu-backdrop {
     bottom: 210px;
     width: auto;
     max-height: 220px;
-    padding: 10px;
+    padding: 8px;
   }
 
-  .order-tracker-panel {
-    left: 12px;
-    right: 12px;
-    top: 226px;
-    bottom: auto;
-    width: auto;
-    max-height: 210px;
-    padding: 10px;
+  .store-products-panel-list {
+    gap: 6px;
   }
 
   .store-product-row {
     display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .store-product-row > div:first-child {
+    grid-column: 1;
+  }
+
+  .store-product-row .add-to-cart-controls {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    gap: 6px;
   }
 
   .store-product-row button {
     width: 100%;
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  .product-quantity-control {
+    padding: 4px 6px;
+    font-size: 11px;
+    gap: 4px;
+  }
+
+  .product-quantity-control input {
+    width: 40px;
+    font-size: 11px;
   }
 
   .account-user .map-status-chip,

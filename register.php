@@ -22,6 +22,7 @@ $values = [
     "store_address"  => "",
     "store_lat"      => "",
     "store_lng"      => "",
+    "store_hours"    => "",
     "store_category" => "",
     "vehicle_registration" => "",
     "orcr_image" => "",
@@ -41,6 +42,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $values["store_address"]  = trim($_POST["store_address"] ?? "");
     $values["store_lat"]      = trim($_POST["store_lat"] ?? "");
     $values["store_lng"]      = trim($_POST["store_lng"] ?? "");
+    $values["store_hours"]    = trim($_POST["store_hours"] ?? "");
     $values["store_category"] = trim($_POST["store_category"] ?? "");
     $values["vehicle_registration"] = trim($_POST["vehicle_registration"] ?? "");
     $password = $_POST["password"] ?? "";
@@ -80,6 +82,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         }
         if ($values["store_address"] === "") {
             $errors[] = "Store address is required.";
+        }
+        if ($values["store_hours"] === "") {
+            $errors[] = "Store hours are required.";
         }
         if ($values["store_lat"] === "" || $values["store_lng"] === "") {
             $errors[] = "Pin your store location on the map.";
@@ -166,8 +171,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     if (!$errors) {
         $hash = password_hash($password, PASSWORD_DEFAULT);
         $stmt = $mysqli->prepare(
-            "INSERT INTO users (account_type, store_name, first_name, middle_name, last_name, contact, email, password_hash, user_address, user_lat, user_lng, store_address, store_lat, store_lng, store_category, vehicle_registration, orcr_image, id_image, profile_image)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO users (account_type, store_name, first_name, middle_name, last_name, contact, email, password_hash, user_address, user_lat, user_lng, store_address, store_lat, store_lng, store_hours, store_category, vehicle_registration, orcr_image, id_image, profile_image)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         );
         if ($stmt) {
             $store_name      = $values["account_type"] === "store" ? $values["store_name"] : null;
@@ -177,6 +182,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $store_address   = $values["account_type"] === "store" ? $values["store_address"]   : null;
             $store_lat       = $values["account_type"] === "store" ? $values["store_lat"]       : null;
             $store_lng       = $values["account_type"] === "store" ? $values["store_lng"]       : null;
+            $store_hours     = $values["account_type"] === "store" ? $values["store_hours"]     : null;
             $store_category  = $values["account_type"] === "store" && $values["store_category"] !== ""
                 ? $values["store_category"] : null;
             $id_image_filename = null;
@@ -231,7 +237,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $vehicle_registration = $values["account_type"] === "driver" ? $values["vehicle_registration"] : null;
 
             $stmt->bind_param(
-                str_repeat("s", 19),
+                str_repeat("s", 20),
                 $values["account_type"],
                 $store_name,
                 $values["first_name"],
@@ -246,6 +252,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 $store_address,
                 $store_lat,
                 $store_lng,
+                $store_hours,
                 $store_category,
                 $vehicle_registration,
                 $orcr_image_filename,
@@ -1118,6 +1125,10 @@ if ($cat_res) {
                                 </div>
                                 <input type="hidden" id="store_lat" name="store_lat" value="<?php echo escape($values["store_lat"]); ?>">
                                 <input type="hidden" id="store_lng" name="store_lng" value="<?php echo escape($values["store_lng"]); ?>">
+                            </div>
+                            <div class="reg-field">
+                                <label for="store_hours">Store Hours</label>
+                                <input type="text" id="store_hours" name="store_hours" value="<?php echo escape($values["store_hours"]); ?>" placeholder="e.g. Mon-Sun, 8:00 AM - 9:00 PM" required>
                             </div>
                         </div>
 

@@ -122,21 +122,57 @@ if ($orders) {
 
 function fmt_money(float $a): string { return "PHP " . number_format($a, 2); }
 
+function parse_pickup_window_start(string $scheduledTime): ?DateTimeImmutable {
+    $value = trim($scheduledTime);
+    if ($value === "" || strtoupper($value) === "ASAP") {
+        return null;
+    }
+
+    $dayOffset = stripos($value, "tomorrow") !== false ? 1 : 0;
+    if (preg_match('/(\d{1,2}):(\d{2})\s*(am|pm)/i', $value, $matches)) {
+        $hour = (int) $matches[1];
+        $minute = (int) $matches[2];
+        $meridiem = strtolower($matches[3]);
+
+        if ($meridiem === "pm" && $hour < 12) {
+            $hour += 12;
+        }
+        if ($meridiem === "am" && $hour === 12) {
+            $hour = 0;
+        }
+
+        $start = new DateTimeImmutable("now");
+        if ($dayOffset) {
+            $start = $start->modify("+1 day");
+        }
+        $start = $start->setTime($hour, $minute, 0);
+        return $start;
+    }
+
+    return null;
+}
+
 function pickup_grace_label(string $scheduledTime): string {
     $value = trim($scheduledTime);
     if ($value === "" || strtoupper($value) === "ASAP") {
-        return "Grace: 15-30 mins";
+        return "Grace window starts now • 15-30 mins";
     }
 
-    return "Pickup time: " . $value . " • Grace: 15-30 mins";
+    $windowStart = parse_pickup_window_start($value);
+    if ($windowStart === null) {
+        return "Pickup time: " . $value . " • Grace: 15-30 mins";
+    }
+
+    $windowEnd = $windowStart->modify("+30 minutes");
+    return "Pickup at " . $windowStart->format("h:i A") . " • Grace: 15-30 mins until " . $windowEnd->format("h:i A");
 }
 
 function status_badge_info(string $s): array {
     $m = [
         "pending"          => ["Pending",           "sb-pending"],
         "delivering"       => ["Delivering",         "sb-delivering"],
-        "ready_for_pickup" => ["Ready for Pickup",   "sb-ready"],
-        "for_pickup"       => ["Ready for Pickup",   "sb-ready"],
+        "ready_for_pickup" => ["Ready to Pickup",   "sb-ready"],
+        "for_pickup"       => ["Ready to Pickup",   "sb-ready"],
         "completed"        => ["Completed",          "sb-completed"],
         "declined"         => ["Rejected",           "sb-declined"],
         "cancelled"        => ["Cancelled",          "sb-cancelled"],
@@ -508,9 +544,9 @@ function status_badge_info(string $s): array {
                         <?php if ($canReady): ?>
                             <button type="button" class="oab oab-ready"
                                 data-action="ready_for_pickup"
-                                data-confirm="Mark Order #<?php echo (int)$order['id']; ?> as ready for pickup?">
+                                data-confirm="Mark Order #<?php echo (int)$order['id']; ?> as ready to pickup?">
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                                Ready for Pickup
+                                Ready to Pickup
                             </button>
                         <?php endif; ?>
                         <?php if ($canPickedUp): ?>
