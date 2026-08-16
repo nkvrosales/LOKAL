@@ -314,10 +314,14 @@ $storeForCart["products"] = $products;
                                 <?php endif; ?>
                             </div>
                             <div class="public-add-controls">
-                                <label class="public-qty-label">
+                                <div class="public-qty-label">
                                     <span>Qty</span>
-                                    <input type="number" min="1" max="99" value="1" inputmode="numeric" data-product-quantity>
-                                </label>
+                                    <div class="public-qty-controls">
+                                        <button type="button" class="public-qty-btn minus" data-qty-action="decrease">−</button>
+                                        <input type="number" min="1" max="99" value="1" inputmode="numeric" data-product-quantity>
+                                        <button type="button" class="public-qty-btn plus" data-qty-action="increase">+</button>
+                                    </div>
+                                </div>
                                 <button type="button" class="public-add-btn" data-product-id="<?php echo (int) $product["id"]; ?>">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                                     Add to cart
@@ -757,6 +761,27 @@ $storeForCart["products"] = $products;
                     button.dataset.productId || "",
                     getRequestedQuantity(button)
                 );
+            });
+        });
+
+        // Handle quantity +/- buttons
+        document.querySelectorAll(".public-qty-btn").forEach((btn) => {
+            btn.addEventListener("click", (e) => {
+                e.preventDefault();
+                const input = btn.closest(".public-qty-controls").querySelector("[data-product-quantity]");
+                if (!input) return;
+                
+                const currentValue = parseInt(input.value, 10) || 1;
+                const action = btn.dataset.qtyAction;
+                let newValue = currentValue;
+                
+                if (action === "increase") {
+                    newValue = Math.min(currentValue + 1, 99);
+                } else if (action === "decrease") {
+                    newValue = Math.max(currentValue - 1, 1);
+                }
+                
+                input.value = String(newValue);
             });
         });
 

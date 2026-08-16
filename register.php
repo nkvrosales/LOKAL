@@ -902,7 +902,7 @@ if ($cat_res) {
         @keyframes spin { to { transform: translateY(-50%) rotate(360deg); } }
 
         /* Responsive Fallback */
-        @media (max-width: 860px) {
+        @media (max-width: 920px) {
             html, body {
                 height: auto;
                 max-height: none;
@@ -912,14 +912,78 @@ if ($cat_res) {
                 height: auto;
                 max-height: none;
                 padding: 16px;
+                align-items: stretch;
+                justify-content: flex-start;
+                min-height: 100vh;
             }
             .reg-container {
                 grid-template-columns: 1fr;
                 height: auto;
                 max-height: none;
+                gap: 12px;
+            }
+            .reg-card {
+                padding: 16px 14px;
+                max-height: none;
+            }
+            .reg-form {
+                max-height: none;
+                overflow-y: auto;
+                padding-right: 4px;
             }
             .reg-side-panel {
-                min-height: 320px;
+                min-height: 280px;
+            }
+            .reg-form-stack {
+                gap: 11px;
+            }
+            .field {
+                gap: 4px;
+            }
+            .field input, .field select, .field textarea {
+                padding: 11px 14px;
+                font-size: 14px;
+            }
+            .choice-group {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .btn {
+                padding: 11px 20px;
+                font-size: 14px;
+            }
+        }
+        
+        @media (max-width: 620px) {
+            .reg-container {
+                gap: 10px;
+            }
+            .reg-card {
+                padding: 14px 12px;
+            }
+            .reg-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+            .reg-header-titles h1 {
+                font-size: 18px;
+            }
+            .reg-header-titles p {
+                font-size: 12px;
+            }
+            .reg-signin-btn {
+                align-self: flex-end;
+                width: 100%;
+                justify-content: center;
+            }
+            .choice-group {
+                grid-template-columns: 1fr;
+            }
+            .reg-map-container {
+                height: 260px;
+            }
+            .reg-map-frame {
+                min-height: 260px;
             }
         }
     </style>
