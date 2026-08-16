@@ -442,10 +442,9 @@ if ($store_ids) {
                                     <em>${escapeHtml(lineTotal)}</em>
                                 </div>
                                 <div class="cart-qty-controls" aria-label="Quantity controls">
-                                    <button type="button" data-cart-action="decrease" aria-label="Decrease quantity">-</button>
-                                    <span>${item.quantity}</span>
-                                    <button type="button" data-cart-action="increase" aria-label="Increase quantity">+</button>
-                                    <button type="button" data-cart-action="remove" aria-label="Remove item">Remove</button>
+                                    <button type="button" data-cart-action="decrease" aria-label="Decrease quantity" class="qty-btn qty-minus">−</button>
+                                    <span class="qty-display">${item.quantity}</span>
+                                    <button type="button" data-cart-action="increase" aria-label="Increase quantity" class="qty-btn qty-plus">+</button>
                                 </div>
                             </article>`;
                 }).join("");
