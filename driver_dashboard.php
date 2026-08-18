@@ -346,17 +346,162 @@ $earnings = fetch_driver_earnings($conn);
             z-index: 1000;
             flex-shrink: 0;
             box-sizing: border-box;
-            transition: margin-left 0.25s ease;
-            box-shadow: none;
+            transition: margin-left 0.25s ease, box-shadow 0.2s ease;
+            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+            position: relative;
+            overflow: hidden;
         }
 
         .sidebar-collapsed .driver-orders-sidebar {
             margin-left: -380px;
         }
 
+        .driver-orders-sidebar .sidebar-header {
+            padding: 20px 20px 16px 20px;
+            border-bottom: 1px solid #F1F5F9;
+            background: #FFFFFF;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            flex-shrink: 0;
+        }
+
+        .driver-orders-sidebar .sidebar-top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding-bottom: 4px;
+        }
+
+        .driver-orders-sidebar .sidebar-title {
+            margin: 0;
+            font-family: "Outfit", sans-serif;
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--primary);
+            letter-spacing: -0.5px;
+        }
+
+        .driver-orders-sidebar .sidebar-collapse-btn {
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            border: 0;
+            background: var(--primary-light);
+            color: var(--primary);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .driver-orders-sidebar .sidebar-collapse-btn:hover {
+            background: rgba(255, 77, 46, 0.18);
+            filter: brightness(0.96);
+        }
+
+        .driver-orders-sidebar .sidebar-search-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .driver-orders-sidebar .sidebar-search-input {
+            flex: 1;
+            height: 44px;
+            padding: 0 16px;
+            border: 1.5px solid #E2E8F0;
+            border-radius: 14px;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--ink);
+            background: #F8FAFC;
+            outline: none;
+            box-sizing: border-box;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .driver-orders-sidebar .sidebar-search-input::placeholder {
+            color: #94A3B8;
+            font-weight: 400;
+        }
+
+        .driver-orders-sidebar .sidebar-search-input:focus {
+            border-color: var(--primary);
+            background: #FFFFFF;
+            box-shadow: 0 0 0 3px rgba(255, 91, 46, 0.08);
+        }
+
+        .driver-orders-sidebar .sidebar-locate-btn {
+            width: 44px;
+            height: 44px;
+            padding: 0;
+            border: 1.5px solid #E2E8F0;
+            border-radius: 14px;
+            background: #FFFFFF;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: all 0.15s ease;
+        }
+
+        .driver-orders-sidebar .sidebar-locate-btn:hover {
+            background: var(--primary-light);
+            border-color: var(--primary);
+        }
+
+        .driver-orders-sidebar .sidebar-categories {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding-top: 4px;
+        }
+
+        .driver-orders-sidebar .cat-pill {
+            padding: 6px 14px;
+            border: 1px solid #E2E8F0;
+            border-radius: 999px;
+            background: #F8FAFC;
+            color: #475569;
+            font-size: 12.5px;
+            font-weight: 600;
+            cursor: pointer;
+            line-height: 1.3;
+            transition: all 0.15s ease;
+        }
+
+        .driver-orders-sidebar .cat-pill:hover {
+            background: var(--primary-light);
+            color: var(--primary);
+            border-color: rgba(255, 77, 46, 0.3);
+        }
+
+        .driver-orders-sidebar .cat-pill.active {
+            background: var(--primary);
+            color: #FFFFFF;
+            border-color: var(--primary);
+            box-shadow: none;
+        }
+
+        .driver-orders-sidebar .sidebar-store-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 20px 24px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%);
+        }
+
         .driver-order-card {
             padding: 16px;
-            border-radius: 16px;
+            border-radius: 18px;
             border: 1.5px solid #E2E8F0;
             background: #FFFFFF;
             display: flex;
@@ -365,16 +510,19 @@ $earnings = fetch_driver_earnings($conn);
             transition: all 0.2s ease;
             box-sizing: border-box;
             width: 100%;
+            box-shadow: 0 10px 18px rgba(15, 23, 42, 0.02);
         }
 
         .driver-order-card:hover {
-            border-color: #CBD5E1;
-            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+            border-color: rgba(255, 77, 46, 0.35);
+            box-shadow: 0 12px 22px rgba(15, 23, 42, 0.06);
+            transform: translateY(-1px);
         }
 
         .driver-order-card.active {
             border-color: var(--primary);
-            box-shadow: 0 0 0 1px var(--primary), 0 6px 16px var(--primary-light);
+            box-shadow: 0 0 0 1px rgba(255, 77, 46, 0.25), 0 10px 28px rgba(255, 77, 46, 0.12);
+            background: linear-gradient(180deg, #FFFFFF 0%, #FFF8F6 100%);
         }
 
         .driver-card-header {
@@ -568,17 +716,17 @@ $earnings = fetch_driver_earnings($conn);
             right: 12px;
             bottom: 92px;
             z-index: 1000;
-            width: 36px;
-            height: 36px;
-            border-radius: 8px;
-            background: #FFFFFF;
-            border: 1.5px solid #E2E8F0;
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.96);
+            border: 1.5px solid rgba(226, 232, 240, 0.9);
             color: var(--primary);
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+            box-shadow: 0 12px 26px rgba(15, 23, 42, 0.18);
             transition: all 0.2s ease;
         }
 
@@ -589,6 +737,204 @@ $earnings = fetch_driver_earnings($conn);
         }
 
         /* ── Delivery Action & Success Modals ── */
+        .menu-toggle {
+            position: absolute;
+            top: 18px;
+            left: 18px;
+            width: 54px;
+            height: 54px;
+            border: 0;
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 5px;
+            background: rgba(255, 91, 46, 0.93);
+            box-shadow: 0 14px 32px rgba(0, 0, 0, 0.26);
+            cursor: pointer;
+            z-index: 1100;
+            transition: transform 0.2s ease, filter 0.2s ease;
+        }
+
+        .menu-toggle:hover {
+            transform: translateY(-1px);
+            filter: brightness(0.98);
+        }
+
+        .menu-toggle span {
+            display: block;
+            width: 24px;
+            height: 2px;
+            border-radius: 99px;
+            background: #fff;
+        }
+
+        .menu-drawer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1300;
+            width: min(340px, 86vw);
+            height: 100%;
+            padding: 24px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            color: var(--ink, #0F172A);
+            background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%);
+            border-right: 1px solid #E2E8F0;
+            transform: translateX(-100%);
+            transition: transform 0.22s ease;
+            box-shadow: 0 22px 48px rgba(15, 23, 42, 0.14);
+            overflow-y: auto;
+        }
+
+        body.menu-open .menu-drawer {
+            transform: translateX(0);
+        }
+
+        .menu-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #F1F5F9;
+        }
+
+        .menu-logo {
+            display: block;
+            width: auto;
+            max-width: 150px;
+            height: 48px;
+            object-fit: contain;
+            filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.06));
+        }
+
+        .menu-close {
+            width: 36px;
+            height: 36px;
+            border: 1px solid #E2E8F0;
+            border-radius: 50%;
+            color: #64748B;
+            background: #F8FAFC;
+            font-size: 20px;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .menu-close:hover {
+            background: var(--primary-light, rgba(255, 77, 46, 0.12));
+            border-color: var(--primary, #FF4D2E);
+            color: var(--primary, #FF4D2E);
+        }
+
+        .menu-section {
+            border-radius: 20px;
+            border: 1px solid #E2E8F0;
+            background: #F8FAFC;
+            padding: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            box-shadow: none;
+        }
+
+        .menu-section h3 {
+            margin: 0 0 4px 0;
+            font-family: "Outfit", sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: #64748B;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .menu-section h3::before {
+            content: "";
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--primary, #FF4D2E);
+            box-shadow: none;
+        }
+
+        .menu-link {
+            width: 100%;
+            border: 1.5px solid #E2E8F0;
+            border-radius: 14px;
+            padding: 12px 16px;
+            text-align: left;
+            color: #1E293B;
+            background: #FFFFFF;
+            font-family: inherit;
+            font-size: 14.5px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            transition: all 0.15s ease;
+            box-sizing: border-box;
+            box-shadow: none;
+        }
+
+        .menu-link svg {
+            color: var(--primary, #FF4D2E);
+            flex-shrink: 0;
+        }
+
+        .menu-link:hover {
+            border-color: rgba(255, 77, 46, 0.4);
+            background: var(--primary-light, rgba(255, 77, 46, 0.08));
+            color: var(--primary-hover, #E03E22);
+        }
+
+        .user-card-info {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 4px 0 8px 0;
+        }
+
+        .menu-user-name {
+            margin: 0;
+            font-family: "Outfit", sans-serif;
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--ink);
+        }
+
+        .menu-user-role {
+            margin: 4px 0 0;
+            font-size: 12px;
+            color: #64748B;
+        }
+
+        .menu-backdrop {
+            position: absolute;
+            inset: 0;
+            z-index: 1200;
+            background: rgba(15, 23, 42, 0.45);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+
+        body.menu-open .menu-backdrop {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
         .driver-modal-backdrop {
             position: fixed;
             inset: 0;
@@ -719,6 +1065,129 @@ $earnings = fetch_driver_earnings($conn);
         .driver-modal-btn.success-done:hover {
             background: #E0481D;
             transform: translateY(-1px);
+        }
+
+        @media (max-width: 768px) {
+            .driver-orders-sidebar {
+                position: absolute;
+                inset: auto 0 0 0;
+                width: 100%;
+                min-width: 100%;
+                max-width: 100%;
+                height: 46vh;
+                max-height: 46vh;
+                min-height: 270px;
+                z-index: 1200;
+                border-radius: 24px 24px 0 0;
+                border-right: 0;
+                border-top: 1.5px solid rgba(15, 23, 42, 0.08);
+                box-shadow: 0 -10px 36px rgba(15, 23, 42, 0.2);
+                transform: translateY(100%);
+                transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+            }
+
+            .driver-orders-sidebar.sidebar-open {
+                transform: translateY(0);
+            }
+
+            .sidebar-collapsed .driver-orders-sidebar {
+                margin-left: 0;
+                transform: translateY(100%);
+            }
+
+            .driver-orders-sidebar .sidebar-header {
+                padding: 10px 16px 8px 16px;
+                gap: 8px;
+                position: relative;
+            }
+
+            .driver-orders-sidebar .sidebar-header::before {
+                content: "";
+                display: block;
+                width: 38px;
+                height: 4px;
+                border-radius: 99px;
+                background: #CBD5E1;
+                margin: 0 auto 4px auto;
+            }
+
+            .driver-orders-sidebar .sidebar-top-bar {
+                padding-bottom: 0;
+            }
+
+            .driver-orders-sidebar .sidebar-title {
+                font-size: 16px;
+            }
+
+            .driver-orders-sidebar .sidebar-collapse-btn {
+                width: 30px;
+                height: 30px;
+                border-radius: 8px;
+            }
+
+            .driver-orders-sidebar .sidebar-search-row {
+                gap: 8px;
+            }
+
+            .driver-orders-sidebar .sidebar-search-input {
+                height: 36px;
+                font-size: 12.5px;
+                padding: 0 12px;
+                border-radius: 10px;
+            }
+
+            .driver-orders-sidebar .sidebar-locate-btn {
+                width: 36px;
+                height: 36px;
+                border-radius: 10px;
+            }
+
+            .driver-orders-sidebar .sidebar-categories {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                padding-bottom: 2px;
+                gap: 6px;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: none;
+            }
+
+            .driver-orders-sidebar .sidebar-categories::-webkit-scrollbar {
+                display: none;
+            }
+
+            .driver-orders-sidebar .cat-pill {
+                padding: 4px 11px;
+                font-size: 11px;
+                white-space: nowrap;
+                flex-shrink: 0;
+            }
+
+            .driver-orders-sidebar .sidebar-store-list {
+                padding: 8px 14px 18px 14px;
+                gap: 8px;
+            }
+
+            .menu-drawer {
+                width: min(340px, 88vw);
+            }
+
+            .menu-toggle {
+                top: 12px;
+                left: 12px;
+                width: 48px;
+                height: 48px;
+                border-radius: 14px;
+            }
+
+            .sidebar-expand-btn {
+                top: 12px;
+                left: 68px;
+                height: 48px;
+                border-radius: 14px;
+                padding: 0 14px;
+                font-size: 12.5px;
+                display: inline-flex !important;
+            }
         }
 
         /* ── Earnings Panel ── */
@@ -1478,16 +1947,48 @@ $earnings = fetch_driver_earnings($conn);
             menuBackdrop.addEventListener("click", closeMenu);
         }
 
-        if (sidebarCollapseBtn && sidebarExpandBtn) {
-            sidebarCollapseBtn.addEventListener("click", () => {
-                document.body.classList.add("sidebar-collapsed");
+        function collapseOrdersSidebar() {
+            document.body.classList.add("sidebar-collapsed");
+            if (sidebar) {
+                sidebar.classList.remove("sidebar-open");
+            }
+            if (sidebarExpandBtn) {
                 sidebarExpandBtn.hidden = false;
-                setTimeout(() => map.invalidateSize(), 360);
-            });
-            sidebarExpandBtn.addEventListener("click", () => {
-                document.body.classList.remove("sidebar-collapsed");
+            }
+            setTimeout(() => map.invalidateSize(), 360);
+        }
+
+        function expandOrdersSidebar() {
+            document.body.classList.remove("sidebar-collapsed");
+            if (sidebar) {
+                sidebar.classList.add("sidebar-open");
+            }
+            if (sidebarExpandBtn) {
                 sidebarExpandBtn.hidden = true;
-                setTimeout(() => map.invalidateSize(), 360);
+            }
+            setTimeout(() => map.invalidateSize(), 360);
+        }
+
+        if (sidebarCollapseBtn && sidebarExpandBtn) {
+            sidebarCollapseBtn.addEventListener("click", collapseOrdersSidebar);
+            sidebarExpandBtn.addEventListener("click", () => {
+                if (window.innerWidth <= 768 && sidebar && sidebar.classList.contains("sidebar-open")) {
+                    collapseOrdersSidebar();
+                } else {
+                    expandOrdersSidebar();
+                }
+            });
+        }
+
+        if (window.innerWidth <= 768 && sidebar) {
+            sidebar.classList.remove("sidebar-open");
+        }
+
+        if (window.innerWidth <= 768 && map) {
+            map.on("click", () => {
+                if (sidebar && sidebar.classList.contains("sidebar-open")) {
+                    collapseOrdersSidebar();
+                }
             });
         }
 
