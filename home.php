@@ -1545,12 +1545,26 @@ if (empty($sidebar_categories)) {
                 sidebarCollapseBtn.addEventListener("click", collapseSidebar);
             }
             if (sidebarExpandBtn) {
-                sidebarExpandBtn.addEventListener("click", expandSidebar);
+                sidebarExpandBtn.addEventListener("click", () => {
+                    if (window.innerWidth <= 768 && storeSidebar && storeSidebar.classList.contains("sidebar-open")) {
+                        collapseSidebar();
+                    } else {
+                        expandSidebar();
+                    }
+                });
+            }
+
+            if (map) {
+                map.on("click", () => {
+                    if (window.innerWidth <= 768 && storeSidebar && storeSidebar.classList.contains("sidebar-open")) {
+                        collapseSidebar();
+                    }
+                });
             }
 
             function checkResponsiveSidebar() {
                 if (window.innerWidth <= 768) {
-                    if (sidebarExpandBtn && (!storeSidebar || !storeSidebar.classList.contains("sidebar-open"))) {
+                    if (sidebarExpandBtn) {
                         sidebarExpandBtn.hidden = false;
                     }
                 } else {
