@@ -599,13 +599,13 @@ body.home-screen::before {
 
 .cart-toggle-btn {
   position: absolute;
-  top: 14px;
-  right: 370px;
+  top: 18px;
+  right: 18px;
   z-index: 1090;
-  width: 48px;
-  height: 48px;
+  width: 54px;
+  height: 54px;
   border: 0;
-  border-radius: 14px;
+  border-radius: 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -613,6 +613,7 @@ body.home-screen::before {
   color: #fff;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
   cursor: pointer;
+  transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease;
 }
 
 .cart-toggle-btn svg {
@@ -620,15 +621,15 @@ body.home-screen::before {
   height: 24px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 2;
+  stroke-width: 2.2;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
 .cart-toggle-btn span {
   position: absolute;
-  top: -6px;
-  right: -6px;
+  top: -5px;
+  right: -5px;
   min-width: 22px;
   height: 22px;
   padding: 0 6px;
@@ -636,36 +637,39 @@ body.home-screen::before {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #FF5B2E;
-  color: #000000;
+  background: #111827;
+  color: #FFFFFF;
   font-size: 11px;
   font-weight: 800;
-  border: 1px solid rgba(0, 0, 0, 0.22);
+  border: 2px solid #FFFFFF;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
 }
 
 .order-tracker-bubble {
   position: absolute;
-  top: 74px;
-  right: 370px;
+  top: 18px;
+  right: 84px;
   z-index: 1090;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-height: 42px;
+  height: 54px;
   border: 0;
-  border-radius: 999px;
-  padding: 9px 12px;
+  border-radius: 16px;
+  padding: 0 18px;
   background: #FF5B2E;
   color: #fff;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.24);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
   cursor: pointer;
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
+  white-space: nowrap;
+  transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease;
 }
 
 .order-tracker-bubble[hidden] {
-  display: none;
+  display: none !important;
 }
 
 .order-tracker-bubble b {
@@ -674,26 +678,28 @@ body.home-screen::before {
   min-width: 22px;
   height: 22px;
   border-radius: 999px;
-  background: #fff;
-  color: #000000;
+  background: #FFFFFF;
+  color: #111827;
   padding: 0 6px;
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 800;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
 }
 
 .cart-panel {
   position: absolute;
-  top: 14px;
-  right: 20px;
+  top: 84px;
+  right: 18px;
   z-index: 1080;
-  width: min(330px, calc(100vw - 40px));
-  max-height: min(430px, calc(100vh - 250px));
+  width: min(390px, calc(100vw - 36px));
+  max-height: min(560px, calc(100vh - 110px));
   display: grid;
   gap: 10px;
-  padding: 12px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.96);
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.97);
   border: 1px solid rgba(255, 91, 46, 0.18);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.24);
 }
 
 .cart-panel[hidden],
@@ -1226,12 +1232,13 @@ body.home-screen::before {
 }
 
 .account-user .cart-toggle-btn {
+  top: 18px;
   right: 18px;
 }
 
 .account-user .order-tracker-bubble {
-  right: 18px;
-  top: 130px;
+  top: 18px;
+  right: 84px;
 }
 
 .menu-drawer {
@@ -2238,27 +2245,24 @@ body.menu-open .menu-backdrop {
 }
 
 @media (min-width: 721px) {
-  .account-user .product-search-shell {
-    width: min(560px, calc(100vw - 550px));
-  }
-
   .account-user .map-status-chip {
-    top: 16px;
+    top: 18px;
     left: 50%;
     right: auto;
     transform: translateX(-50%);
     width: auto;
-    max-width: min(400px, calc(100vw - 120px));
-    z-index: 1110;
+    max-width: min(400px, calc(100vw - 360px));
+    z-index: 1000;
   }
 
   .account-user .cart-toggle-btn {
+    top: 18px;
     right: 18px;
   }
 
   .account-user .order-tracker-bubble {
-    right: 18px;
-    top: 130px;
+    top: 18px;
+    right: 84px;
   }
 
   .account-user .cart-panel,
@@ -2266,10 +2270,10 @@ body.menu-open .menu-backdrop {
   .account-user .order-tracker-panel {
     left: auto;
     right: 18px;
-    top: 18px;
+    top: 84px;
     bottom: auto;
     width: min(390px, calc(100vw - 36px));
-    max-height: min(520px, calc(100vh - 132px));
+    max-height: min(560px, calc(100vh - 110px));
     border-radius: 18px;
     overflow: hidden;
     z-index: 1120;
@@ -2277,7 +2281,7 @@ body.menu-open .menu-backdrop {
   }
 
   .account-user .order-tracker-panel {
-    max-height: min(460px, calc(100vh - 150px));
+    max-height: min(520px, calc(100vh - 110px));
   }
 
   .account-user .store-products-panel,
@@ -2313,51 +2317,6 @@ body.menu-open .menu-backdrop {
     align-content: start;
     border-radius: 18px;
     padding: 16px;
-  }
-}
-
-@media (min-width: 721px) and (max-width: 1100px) {
-  .account-user .product-search-shell {
-    left: 84px;
-    right: 96px;
-    width: auto;
-    max-width: none;
-  }
-
-  .account-user .cart-toggle-btn {
-    top: 18px;
-    right: 18px;
-  }
-
-  .account-user .map-status-chip,
-  body.cart-open.account-user .map-status-chip {
-    top: 16px;
-    left: 50%;
-    right: auto;
-    transform: translateX(-50%);
-    width: auto;
-    max-width: min(400px, calc(100vw - 120px));
-  }
-
-  .account-user .order-tracker-bubble {
-    top: 78px;
-    right: 18px;
-  }
-
-  .account-user .cart-panel,
-  .account-user .store-products-panel {
-    top: 18px;
-    right: 18px;
-    width: min(360px, calc(100vw - 36px));
-    max-height: min(440px, calc(100vh - 120px));
-  }
-
-  .account-user .order-tracker-panel {
-    top: 184px;
-    right: 18px;
-    left: 18px;
-    width: auto;
-    max-height: min(360px, calc(100vh - 220px));
   }
 }
 
@@ -2415,28 +2374,33 @@ body.menu-open .menu-backdrop {
   }
 
   .cart-toggle-btn {
-    top: 126px;
+    top: 12px;
     right: 12px;
-    width: 44px;
-    height: 44px;
-    border-radius: 13px;
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
   }
 
   .order-tracker-bubble {
-    top: 126px;
-    right: 66px;
-    min-height: 44px;
-    border-radius: 13px;
+    top: 12px;
+    right: 68px;
+    height: 48px;
+    min-height: 48px;
+    border-radius: 14px;
+    padding: 0 12px;
+    gap: 6px;
+    font-size: 12px;
   }
 
   .cart-panel {
-    top: 226px;
+    top: 68px;
     left: 12px;
     right: 12px;
     width: auto;
     bottom: 12px;
-    max-height: none;
-    padding: 10px;
+    max-height: calc(100vh - 80px);
+    padding: 12px;
+    border-radius: 18px;
     overflow: hidden;
     grid-template-rows: auto minmax(0, 1fr) auto auto auto;
   }
@@ -2536,29 +2500,32 @@ body.menu-open .menu-backdrop {
 
   .account-user .map-status-chip,
   body.cart-open.account-user .map-status-chip {
-    top: 12px;
+    top: 68px;
     left: 50%;
     right: auto;
     transform: translateX(-50%);
     width: auto;
-    max-width: calc(100vw - 80px);
+    max-width: calc(100vw - 24px);
     box-sizing: border-box;
-    max-width: calc(100vw - 132px);
   }
 
   .account-user .cart-toggle-btn {
-    top: 126px;
+    top: 12px;
     right: 12px;
   }
 
   .account-user .order-tracker-bubble {
-    top: 176px;
-    right: 12px;
+    top: 12px;
+    right: 68px;
   }
 
   .account-user .order-tracker-panel {
-    top: 280px;
-    max-height: min(210px, calc(100vh - 316px));
+    top: 68px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-height: min(440px, calc(100vh - 140px));
+    z-index: 1150;
   }
 
   body.cart-open.account-user .store-carousel-panel {

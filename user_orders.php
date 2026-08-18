@@ -21,7 +21,7 @@ $stmt = $mysqli->prepare(
      FROM orders
      WHERE customer_user_id = ?
        AND order_type IN ('delivery', 'pickup')
-       AND status IN ('pending', 'for_pickup', 'ready_for_pickup', 'delivering', 'completed')
+       AND status IN ('pending', 'for_pickup', 'ready_for_pickup', 'delivering')
      ORDER BY created_at DESC
      LIMIT 20"
 );

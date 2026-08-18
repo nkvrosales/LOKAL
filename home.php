@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once "auth.php";
 require_once "db.php";
 require_login();
@@ -246,7 +246,7 @@ if (empty($sidebar_categories)) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Home | Lokal</title>
     <link rel="stylesheet" href="assets/styles.css?v=primary-bw-icons-1">
-    <link rel="stylesheet" href="assets/home.css?v=mobile-stores-btn-fix-2">
+    <link rel="stylesheet" href="assets/home.css?v=cart-order-pos-fix-1">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 </head>
 <body class="home-screen <?php echo $is_store ? "account-store" : "account-user"; ?>">
@@ -932,7 +932,11 @@ if (empty($sidebar_categories)) {
                     return;
                 }
 
-                const orders = payload && Array.isArray(payload.orders) ? payload.orders : [];
+                const rawOrders = payload && Array.isArray(payload.orders) ? payload.orders : [];
+                const orders = rawOrders.filter((order) => {
+                    const status = String(order.status || "").toLowerCase();
+                    return status !== "completed" && status !== "cancelled" && status !== "declined";
+                });
                 if (!orders.length) {
                     orderTrackerPanel.hidden = true;
                     if (orderTrackerBubble) {
