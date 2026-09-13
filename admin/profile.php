@@ -144,21 +144,58 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 </div>
             <?php endif; ?>
 
+            <style>
+                .pw-wrap { position:relative; }
+                .pw-wrap input { padding-right:44px; width:100%; box-sizing:border-box; }
+                .pw-toggle {
+                    position:absolute; right:10px; top:50%; transform:translateY(-50%);
+                    background:none; border:none; cursor:pointer; padding:4px;
+                    color:rgba(0,0,0,.4); display:flex; align-items:center; justify-content:center;
+                    border-radius:6px; transition:color .15s;
+                }
+                .pw-toggle:hover { color:rgba(0,0,0,.75); }
+            </style>
             <form method="post" class="admin-add-form">
                 <div class="field">
                     <label for="current_password">Current password</label>
-                    <input type="password" id="current_password" name="current_password" required>
+                    <div class="pw-wrap">
+                        <input type="password" id="current_password" name="current_password" required>
+                        <button type="button" class="pw-toggle" aria-label="Toggle password visibility" onclick="togglePw('current_password', this)">
+                            <svg id="eye-icon-current_password" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                    </div>
                 </div>
                 <div class="field">
                     <label for="new_password">New password</label>
-                    <input type="password" id="new_password" name="new_password" required>
+                    <div class="pw-wrap">
+                        <input type="password" id="new_password" name="new_password" required>
+                        <button type="button" class="pw-toggle" aria-label="Toggle password visibility" onclick="togglePw('new_password', this)">
+                            <svg id="eye-icon-new_password" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                    </div>
                 </div>
                 <div class="field">
                     <label for="confirm_password">Confirm new password</label>
-                    <input type="password" id="confirm_password" name="confirm_password" required>
+                    <div class="pw-wrap">
+                        <input type="password" id="confirm_password" name="confirm_password" required>
+                        <button type="button" class="pw-toggle" aria-label="Toggle password visibility" onclick="togglePw('confirm_password', this)">
+                            <svg id="eye-icon-confirm_password" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                    </div>
                 </div>
                 <button class="btn" type="submit">Change Password</button>
             </form>
+            <script>
+            const EYE_OPEN = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+            const EYE_CLOSED = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>';
+            function togglePw(id, btn) {
+                const inp = document.getElementById(id);
+                const isHidden = inp.type === 'password';
+                inp.type = isHidden ? 'text' : 'password';
+                document.getElementById('eye-icon-' + id).innerHTML = isHidden ? EYE_CLOSED : EYE_OPEN;
+                btn.setAttribute('aria-label', isHidden ? 'Hide password' : 'Show password');
+            }
+            </script>
         </section>
     </main>
 </body>

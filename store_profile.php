@@ -36,7 +36,7 @@ function store_hours_status(string $hours): string {
         "sat" => 6,
     ];
 
-    $normalizeDay = static function (string $token): int {
+    $normalizeDay = static function (string $token) use ($days): int {
         $token = strtolower(substr(trim($token), 0, 3));
         return $days[$token] ?? 0;
     };
@@ -49,25 +49,26 @@ function store_hours_status(string $hours): string {
 
     $matches = [];
     preg_match_all(
-        '/((?:mon|tue|wed|thu|fri|sat|sun))\s*(?:-\s*((?:mon|tue|wed|thu|fri|sat|sun)))?\s*,?\s*([0-9]{1,2})(?::([0-9]{2}))?\s*(am|pm)\s*-\s*([0-9]{1,2})(?::([0-9]{2}))?\s*(am|pm)/i',
+        '/(?:((?:mon|tue|wed|thu|fri|sat|sun))\s*(?:-\s*((?:mon|tue|wed|thu|fri|sat|sun)))?\s*,?\s*)?([0-9]{1,2})(?::([0-9]{2}))?\s*(am|pm)\s*-\s*([0-9]{1,2})(?::([0-9]{2}))?\s*(am|pm)/i',
         $value,
         $matches,
         PREG_SET_ORDER
     );
 
-    $now = new DateTimeImmutable('now');
+    $now = new DateTimeImmutable('now', new DateTimeZone('Asia/Manila'));
     $nowMinutes = $normalizeMinutes((int) $now->format('G'), (int) $now->format('i'));
     $currentDay = (int) $now->format('w');
     $currentDay = $currentDay === 0 ? 0 : $currentDay; // Sunday => 0
 
     foreach ($matches as $match) {
-        $startDay = $normalizeDay($match[1]);
-        $endDay = isset($match[2]) && trim($match[2]) !== '' ? $normalizeDay($match[2]) : $startDay;
+        $hasDay = isset($match[1]) && trim($match[1]) !== '';
+        $startDay = $hasDay ? $normalizeDay($match[1]) : 0;
+        $endDay = ($hasDay && isset($match[2]) && trim($match[2]) !== '') ? $normalizeDay($match[2]) : ($hasDay ? $startDay : 6);
         $startHour = (int) $match[3];
         $startMinute = (int) ($match[4] ?? 0);
-        $endHour = (int) $match[5];
-        $endMinute = (int) ($match[6] ?? 0);
-        $startMeridiem = strtolower($match[7]);
+        $endHour = (int) $match[6];
+        $endMinute = (int) ($match[7] ?? 0);
+        $startMeridiem = strtolower($match[5]);
         $endMeridiem = strtolower($match[8]);
 
         if (strtolower($startMeridiem) === 'pm' && $startHour < 12) {
@@ -87,11 +88,15 @@ function store_hours_status(string $hours): string {
         $endMinutes = $normalizeMinutes($endHour, $endMinute);
 
         $inRange = false;
-        $daySpan = $endDay - $startDay;
-        if ($daySpan >= 0) {
-            $inRange = $currentDay >= $startDay && $currentDay <= $endDay;
+        if (!$hasDay) {
+            $inRange = true;
         } else {
-            $inRange = $currentDay >= $startDay || $currentDay <= $endDay;
+            $daySpan = $endDay - $startDay;
+            if ($daySpan >= 0) {
+                $inRange = $currentDay >= $startDay && $currentDay <= $endDay;
+            } else {
+                $inRange = $currentDay >= $startDay || $currentDay <= $endDay;
+            }
         }
 
         if (!$inRange) {
@@ -241,7 +246,7 @@ $storeForCart["products"] = $products;
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo escape($store["name"]); ?> | Lokal</title>
     <link rel="stylesheet" href="assets/styles.css?v=primary-bw-icons-1">
-    <link rel="stylesheet" href="assets/store-admin.css?v=store-enhancements-3">
+    <link rel="stylesheet" href="assets/store-admin.css?v=responsive-tabs-v5">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 </head>
 <body class="store-admin-body">

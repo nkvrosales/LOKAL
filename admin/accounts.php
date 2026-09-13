@@ -4,6 +4,7 @@ admin_require_admin();
 
 $errors = [];
 $notice = "";
+$pageError = "";
 $newAdmin = [
     "first_name" => "",
     "middle_name" => "",
@@ -22,86 +23,91 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $upd = $mysqli->prepare("UPDATE users SET is_approved = ? WHERE id = ? AND account_type = 'driver' LIMIT 1");
             if ($upd) {
                 $upd->bind_param('ii', $approveVal, $driverId);
-                if ($upd->execute() && $upd->affected_rows > 0) {
-                    $notice = $approveVal ? 'Driver approved.' : 'Driver approval revoked.';
+                if ($upd->execute()) {
+                    $upd->close();
+                    $msg = $approveVal ? 'Driver approved.' : 'Driver approval revoked.';
+                    header("Location: accounts.php?notice=" . urlencode($msg));
+                    exit;
                 } else {
-                    $errors[] = 'Unable to update driver status.';
+                    $pageError = 'Unable to update driver status.';
                 }
                 $upd->close();
             } else {
-                $errors[] = 'Unable to update driver status.';
+                $pageError = 'Unable to update driver status.';
             }
         }
-    }
-
-    foreach ($newAdmin as $field => $_) {
-        $newAdmin[$field] = trim($_POST[$field] ?? "");
-    }
-    $password = $_POST["password"] ?? "";
-    $confirmPassword = $_POST["confirm_password"] ?? "";
-
-    if ($newAdmin["first_name"] === "" || $newAdmin["middle_name"] === "" || $newAdmin["last_name"] === "") {
-        $errors[] = "Complete admin name is required.";
-    }
-    if ($newAdmin["contact"] === "") {
-        $errors[] = "Contact is required.";
-    }
-    if (!filter_var($newAdmin["email"], FILTER_VALIDATE_EMAIL)) {
-        $errors[] = "A valid email is required.";
-    }
-    if (strlen($password) < 6) {
-        $errors[] = "Password must be at least 6 characters.";
-    }
-    if ($password !== $confirmPassword) {
-        $errors[] = "Passwords do not match.";
-    }
-
-    if (!$errors) {
-        $check = $mysqli->prepare("SELECT id FROM users WHERE email = ? LIMIT 1");
-        if ($check) {
-            $check->bind_param("s", $newAdmin["email"]);
-            $check->execute();
-            $check->store_result();
-            if ($check->num_rows > 0) {
-                $errors[] = "Email is already registered.";
-            }
-            $check->close();
+    } else {
+        // Add admin form submission
+        foreach ($newAdmin as $field => $_) {
+            $newAdmin[$field] = trim($_POST[$field] ?? "");
         }
-    }
+        $password = $_POST["password"] ?? "";
+        $confirmPassword = $_POST["confirm_password"] ?? "";
 
-    if (!$errors) {
-        $accountType = "admin";
-        $hash = password_hash($password, PASSWORD_DEFAULT);
-        $stmt = $mysqli->prepare(
-            "INSERT INTO users (account_type, first_name, middle_name, last_name, contact, email, password_hash)
-             VALUES (?, ?, ?, ?, ?, ?, ?)"
-        );
-        if ($stmt) {
-            $stmt->bind_param(
-                "sssssss",
-                $accountType,
-                $newAdmin["first_name"],
-                $newAdmin["middle_name"],
-                $newAdmin["last_name"],
-                $newAdmin["contact"],
-                $newAdmin["email"],
-                $hash
+        if ($newAdmin["first_name"] === "" || $newAdmin["middle_name"] === "" || $newAdmin["last_name"] === "") {
+            $errors[] = "Complete admin name is required.";
+        }
+        if ($newAdmin["contact"] === "") {
+            $errors[] = "Contact is required.";
+        }
+        if (!filter_var($newAdmin["email"], FILTER_VALIDATE_EMAIL)) {
+            $errors[] = "A valid email is required.";
+        }
+        if (strlen($password) < 6) {
+            $errors[] = "Password must be at least 6 characters.";
+        }
+        if ($password !== $confirmPassword) {
+            $errors[] = "Passwords do not match.";
+        }
+
+        if (!$errors) {
+            $check = $mysqli->prepare("SELECT id FROM users WHERE email = ? LIMIT 1");
+            if ($check) {
+                $check->bind_param("s", $newAdmin["email"]);
+                $check->execute();
+                $check->store_result();
+                if ($check->num_rows > 0) {
+                    $errors[] = "Email is already registered.";
+                }
+                $check->close();
+            }
+        }
+
+        if (!$errors) {
+            $accountType = "admin";
+            $hash = password_hash($password, PASSWORD_DEFAULT);
+            $stmt = $mysqli->prepare(
+                "INSERT INTO users (account_type, first_name, middle_name, last_name, contact, email, password_hash)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)"
             );
-            if ($stmt->execute()) {
-                header("Location: accounts.php?notice=" . urlencode("Admin account created."));
-                exit;
+            if ($stmt) {
+                $stmt->bind_param(
+                    "sssssss",
+                    $accountType,
+                    $newAdmin["first_name"],
+                    $newAdmin["middle_name"],
+                    $newAdmin["last_name"],
+                    $newAdmin["contact"],
+                    $newAdmin["email"],
+                    $hash
+                );
+                if ($stmt->execute()) {
+                    header("Location: accounts.php?notice=" . urlencode("Admin account created."));
+                    exit;
+                } else {
+                    $errors[] = "Unable to create admin account.";
+                }
+                $stmt->close();
             } else {
                 $errors[] = "Unable to create admin account.";
             }
-            $stmt->close();
-        } else {
-            $errors[] = "Unable to create admin account.";
         }
     }
-}
+} // end if POST
 
 $accounts = admin_fetch_accounts($mysqli);
 $notice = $notice !== "" ? $notice : htmlspecialchars(urldecode($_GET["notice"] ?? ""));
+$pageError = $pageError !== "" ? $pageError : htmlspecialchars(urldecode($_GET["error"] ?? ""));
 $showAddModal = !empty($errors);
 ?>
 <!DOCTYPE html>
@@ -114,11 +120,14 @@ $showAddModal = !empty($errors);
     <link rel="stylesheet" href="../assets/styles.css?v=large-logo-1">
     <link rel="stylesheet" href="../assets/store-admin.css?v=hover-effects-1">
     <link rel="stylesheet" href="assets/admin.css?v=large-logo-1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         .acct-modal-backdrop { position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:900;display:flex;align-items:center;justify-content:center; }
         .acct-modal-backdrop[hidden] { display:none !important; }
         .acct-modal-panel { background:#fff;border-radius:18px;padding:26px 28px;width:min(520px,94vw);display:grid;gap:14px;position:relative; }
-        .acct-modal-panel h2 { margin:0;font-family:"Cinzel","Georgia",serif;font-size:17px;color:#FF5B2E; }
+        .acct-modal-panel h2 { margin:0;font-family:"Plus Jakarta Sans",system-ui,sans-serif;font-size:17px;font-weight:700;color:#FF5B2E; }
         .acct-field { display:grid;gap:4px; }
         .acct-field label { font-size:12px;font-weight:600;color:rgba(0,0,0,.6); }
         .acct-field input { height:42px;padding:0 13px;border:1px solid rgba(255,91,46,.22);border-radius:10px;font-size:13.5px;outline:none;width:100%;box-sizing:border-box;transition:border-color .15s; }
@@ -133,6 +142,43 @@ $showAddModal = !empty($errors);
         .acct-btn-cancel:hover { background:rgba(0,0,0,.12); }
         .acct-btn-add { height:38px;padding:0 20px;background:#FF5B2E;color:#fff;border:0;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;transition:background .15s; }
         .acct-btn-add:hover { background:#e04a1f; }
+        .acct-pw-wrap { position:relative; }
+        .acct-pw-wrap input { padding-right:40px; width:100%; box-sizing:border-box; }
+        .acct-pw-toggle {
+            position:absolute; right:9px; top:50%; transform:translateY(-50%);
+            background:none; border:none; cursor:pointer; padding:4px;
+            color:rgba(0,0,0,.38); display:flex; align-items:center; justify-content:center;
+            border-radius:6px; transition:color .15s;
+        }
+        .acct-pw-toggle:hover { color:rgba(0,0,0,.72); }
+        /* ── Table action buttons ── */
+        .acct-btn-approve, .acct-btn-revoke {
+            height: 32px;
+            padding: 0 14px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background .15s, border-color .15s;
+        }
+        .acct-btn-approve {
+            border: 1px solid rgba(34, 197, 94, 0.25);
+            background: rgba(34, 197, 94, 0.1);
+            color: #15803d;
+        }
+        .acct-btn-approve:hover {
+            background: rgba(34, 197, 94, 0.18);
+            border-color: rgba(34, 197, 94, 0.4);
+        }
+        .acct-btn-revoke {
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            background: rgba(239, 68, 68, 0.1);
+            color: #dc2626;
+        }
+        .acct-btn-revoke:hover {
+            background: rgba(239, 68, 68, 0.18);
+            border-color: rgba(239, 68, 68, 0.4);
+        }
     </style>
 </head>
 <body class="store-admin-body admin-body">
@@ -156,7 +202,16 @@ $showAddModal = !empty($errors);
             </div>
 
             <?php if ($notice !== ""): ?>
-                <div class="notice success"><?php echo escape($notice); ?></div>
+                <div class="notice success" id="acct-notice">
+                    <span><?php echo escape($notice); ?></span>
+                    <button class="notice-dismiss" onclick="dismissAcctNotice('acct-notice')" type="button" aria-label="Dismiss">&times;</button>
+                </div>
+            <?php endif; ?>
+            <?php if ($pageError !== ""): ?>
+                <div class="notice error" id="acct-error">
+                    <span><?php echo escape($pageError); ?></span>
+                    <button class="notice-dismiss" onclick="dismissAcctNotice('acct-error')" type="button" aria-label="Dismiss">&times;</button>
+                </div>
             <?php endif; ?>
 
             <div class="admin-table-wrap">
@@ -209,9 +264,9 @@ $showAddModal = !empty($errors);
                                                     <form method="post" style="display:inline;margin-left:8px;">
                                                         <input type="hidden" name="driver_id" value="<?php echo (int) $account['id']; ?>">
                                                          <?php if (!$account["is_approved"]): ?>
-                                                            <button type="submit" name="driver_action" value="approve" class="acct-btn-save">Approve</button>
+                                                            <button type="submit" name="driver_action" value="approve" class="acct-btn-approve">Approve</button>
                                                         <?php else: ?>
-                                                            <button type="submit" name="driver_action" value="revoke" class="acct-btn-cancel">Revoke</button>
+                                                            <button type="submit" name="driver_action" value="revoke" class="acct-btn-revoke">Revoke</button>
                                                         <?php endif; ?>
                                                     </form>
                                                 </td>
@@ -268,11 +323,21 @@ $showAddModal = !empty($errors);
                     <div class="acct-split">
                         <div class="acct-field">
                             <label for="password">Password <span style="color:#FF5B2E">*</span></label>
-                            <input type="password" id="password" name="password" required>
+                            <div class="acct-pw-wrap">
+                                <input type="password" id="password" name="password" required>
+                                <button type="button" class="acct-pw-toggle" aria-label="Toggle password visibility" onclick="toggleAcctPw('password', this)">
+                                    <svg id="acct-eye-password" xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                </button>
+                            </div>
                         </div>
                         <div class="acct-field">
                             <label for="confirm_password">Confirm password <span style="color:#FF5B2E">*</span></label>
-                            <input type="password" id="confirm_password" name="confirm_password" required>
+                            <div class="acct-pw-wrap">
+                                <input type="password" id="confirm_password" name="confirm_password" required>
+                                <button type="button" class="acct-pw-toggle" aria-label="Toggle password visibility" onclick="toggleAcctPw('confirm_password', this)">
+                                    <svg id="acct-eye-confirm_password" xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -290,6 +355,35 @@ $showAddModal = !empty($errors);
         function closeAddAdminModal() { addAdminModal.hidden = true; }
         addAdminModal.addEventListener("click", e => { if (e.target === addAdminModal) closeAddAdminModal(); });
         document.addEventListener("keydown", e => { if (e.key === "Escape") closeAddAdminModal(); });
+
+        const ACCT_EYE_OPEN   = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+        const ACCT_EYE_CLOSED = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>';
+        function toggleAcctPw(id, btn) {
+            const inp = document.getElementById(id);
+            const isHidden = inp.type === 'password';
+            inp.type = isHidden ? 'text' : 'password';
+            document.getElementById('acct-eye-' + id).innerHTML = isHidden ? ACCT_EYE_CLOSED : ACCT_EYE_OPEN;
+            btn.setAttribute('aria-label', isHidden ? 'Hide password' : 'Show password');
+        }
+
+        function dismissAcctNotice(id) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.style.transition = "opacity 0.25s ease, transform 0.25s ease";
+            el.style.opacity = "0";
+            el.style.transform = "translateY(-4px)";
+            setTimeout(() => el.remove(), 260);
+            if (window.history.replaceState) {
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        }
+
+        if (document.getElementById('acct-notice')) {
+            setTimeout(() => dismissAcctNotice('acct-notice'), 5000);
+        }
+        if (document.getElementById('acct-error')) {
+            setTimeout(() => dismissAcctNotice('acct-error'), 5000);
+        }
     </script>
 </body>
 </html>

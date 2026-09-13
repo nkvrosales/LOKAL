@@ -68,15 +68,16 @@ function fetch_driver_orders(mysqli $mysqli): array
          LEFT JOIN users su ON su.id = o.store_user_id
          WHERE o.order_type = 'delivery'
            AND (
-             o.status IN ('pending', 'delivering')
+             o.status IN ('pending', 'for_pickup', 'delivering')
              OR (o.status = 'completed' AND DATE(o.delivered_at) = CURRENT_DATE())
            )
          ORDER BY 
            CASE o.status
              WHEN 'delivering' THEN 1
-             WHEN 'pending' THEN 2
-             WHEN 'completed' THEN 3
-             ELSE 4
+             WHEN 'for_pickup' THEN 2
+             WHEN 'pending' THEN 3
+             WHEN 'completed' THEN 4
+             ELSE 5
            END,
            o.created_at DESC
          LIMIT 30"
@@ -213,41 +214,61 @@ function build_live_payload(mysqli $mysqli): array
 function update_order_status(mysqli $mysqli, int $orderId, string $action): array
 {
     $transitions = [
-        "accept" => ["from" => "pending", "to" => "delivering", "time_column" => "accepted_at"],
-        "decline" => ["from" => "pending", "to" => "declined", "time_column" => "declined_at"],
-        "complete" => ["from" => "delivering", "to" => "completed", "time_column" => "delivered_at"],
+        "accept"   => ["from" => "pending",    "to" => "for_pickup",  "time_column" => "accepted_at"],
+        "pickup"   => ["from" => "for_pickup", "to" => "delivering",  "time_column" => "pickup_at"],
+        "decline"  => ["from" => "pending",    "to" => "declined",    "time_column" => "declined_at"],
+        "complete" => ["from" => "delivering", "to" => "completed",   "time_column" => "delivered_at"],
     ];
 
     if (!isset($transitions[$action]) || $orderId <= 0) {
         return ["ok" => false, "message" => "Invalid order action."];
     }
 
-    $transition = $transitions[$action];
-    $timeColumn = $transition["time_column"];
-
     if ($action === "accept") {
         $stmt = $mysqli->prepare(
             "UPDATE orders
-             SET status = 'delivering', accepted_at = CURRENT_TIMESTAMP, pickup_at = CURRENT_TIMESTAMP
+             SET status = 'for_pickup', accepted_at = CURRENT_TIMESTAMP
              WHERE id = ? AND status = 'pending'
              LIMIT 1"
         );
+        if (!$stmt) {
+            return ["ok" => false, "message" => "Unable to update order."];
+        }
+        $stmt->bind_param("i", $orderId);
+    } elseif ($action === "pickup") {
+        $stmt = $mysqli->prepare(
+            "UPDATE orders
+             SET status = 'delivering', pickup_at = CURRENT_TIMESTAMP
+             WHERE id = ? AND status IN ('for_pickup', 'pending')
+             LIMIT 1"
+        );
+        if (!$stmt) {
+            return ["ok" => false, "message" => "Unable to update order."];
+        }
+        $stmt->bind_param("i", $orderId);
+    } elseif ($action === "complete") {
+        $stmt = $mysqli->prepare(
+            "UPDATE orders
+             SET status = 'completed', delivered_at = CURRENT_TIMESTAMP
+             WHERE id = ? AND status IN ('delivering', 'for_pickup')
+             LIMIT 1"
+        );
+        if (!$stmt) {
+            return ["ok" => false, "message" => "Unable to update order."];
+        }
+        $stmt->bind_param("i", $orderId);
     } else {
+        $transition = $transitions[$action];
+        $timeColumn = $transition["time_column"];
         $stmt = $mysqli->prepare(
             "UPDATE orders
              SET status = ?, {$timeColumn} = CURRENT_TIMESTAMP
              WHERE id = ? AND status = ?
              LIMIT 1"
         );
-    }
-
-    if (!$stmt) {
-        return ["ok" => false, "message" => "Unable to update order."];
-    }
-
-    if ($action === "accept") {
-        $stmt->bind_param("i", $orderId);
-    } else {
+        if (!$stmt) {
+            return ["ok" => false, "message" => "Unable to update order."];
+        }
         $stmt->bind_param("sis", $transition["to"], $orderId, $transition["from"]);
     }
 
@@ -383,7 +404,13 @@ $earnings = fetch_driver_earnings($conn);
             letter-spacing: -0.5px;
         }
 
-        .driver-orders-sidebar .sidebar-collapse-btn {
+        .driver-orders-sidebar .sidebar-top-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .driver-orders-sidebar .sidebar-top-btn {
             width: 34px;
             height: 34px;
             border-radius: 10px;
@@ -397,9 +424,13 @@ $earnings = fetch_driver_earnings($conn);
             transition: all 0.2s ease;
         }
 
-        .driver-orders-sidebar .sidebar-collapse-btn:hover {
+        .driver-orders-sidebar .sidebar-top-btn:hover {
             background: rgba(255, 77, 46, 0.18);
             filter: brightness(0.96);
+        }
+
+        .driver-orders-sidebar .sidebar-maximize-btn {
+            display: none;
         }
 
         .driver-orders-sidebar .sidebar-search-row {
@@ -632,16 +663,50 @@ $earnings = fetch_driver_earnings($conn);
             word-break: break-word;
         }
 
-        .driver-order-amount {
+        .driver-price-breakdown {
+            background: #F8FAFC;
+            border: 1.5px solid #EDF2F7;
+            border-radius: 12px;
+            padding: 10px 12px;
             display: flex;
-            align-items: center;
+            flex-direction: column;
+            gap: 6px;
+            margin-top: 3px;
+        }
+
+        .driver-price-row {
+            display: flex;
             justify-content: space-between;
+            align-items: center;
             font-size: 13px;
             color: #475569;
+        }
+
+        .driver-price-label {
             font-weight: 600;
         }
 
-        .driver-order-total {
+        .driver-price-val {
+            font-weight: 700;
+            color: #0F172A;
+        }
+
+        .driver-price-val.highlight-fee {
+            color: #0F172A;
+        }
+
+        .driver-price-row.driver-price-total {
+            border-top: 1px dashed #CBD5E1;
+            padding-top: 6px;
+            margin-top: 2px;
+        }
+
+        .driver-price-row.driver-price-total .driver-price-label {
+            font-weight: 700;
+            color: #0F172A;
+        }
+
+        .driver-price-row.driver-price-total .driver-order-total {
             font-family: "Outfit", sans-serif;
             font-size: 16px;
             font-weight: 800;
@@ -679,6 +744,18 @@ $earnings = fetch_driver_earnings($conn);
             border-color: var(--primary);
             color: var(--primary);
             background: var(--primary-light);
+        }
+
+        .driver-btn.btn-route {
+            background: #F8FAFC;
+            border-color: #CBD5E1;
+            color: #334155;
+        }
+
+        .driver-btn.btn-route:hover {
+            background: #FFF5F2;
+            border-color: var(--primary);
+            color: var(--primary);
         }
 
         .driver-btn.btn-primary {
@@ -719,7 +796,7 @@ $earnings = fetch_driver_earnings($conn);
             width: 42px;
             height: 42px;
             border-radius: 12px;
-            background: rgba(255, 255, 255, 0.96);
+            background: #ffffff;
             border: 1.5px solid rgba(226, 232, 240, 0.9);
             color: var(--primary);
             display: flex;
@@ -731,9 +808,20 @@ $earnings = fetch_driver_earnings($conn);
         }
 
         .map-locate-action:hover {
-            background: var(--primary-light);
+            background: #FFF5F2;
             border-color: var(--primary);
+            color: var(--primary);
             transform: scale(1.05);
+        }
+
+        .map-locate-action:active {
+            background: #FFE8E0;
+            transform: scale(0.96);
+        }
+
+        .map-locate-action:focus-visible {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
         }
 
         /* ── Delivery Action & Success Modals ── */
@@ -1083,11 +1171,16 @@ $earnings = fetch_driver_earnings($conn);
                 border-top: 1.5px solid rgba(15, 23, 42, 0.08);
                 box-shadow: 0 -10px 36px rgba(15, 23, 42, 0.2);
                 transform: translateY(100%);
-                transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+                transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), height 0.32s cubic-bezier(0.16, 1, 0.3, 1), max-height 0.32s cubic-bezier(0.16, 1, 0.3, 1);
             }
 
             .driver-orders-sidebar.sidebar-open {
                 transform: translateY(0);
+            }
+
+            .driver-orders-sidebar.sidebar-maximized {
+                height: 88vh;
+                max-height: 88vh;
             }
 
             .sidebar-collapsed .driver-orders-sidebar {
@@ -1104,11 +1197,12 @@ $earnings = fetch_driver_earnings($conn);
             .driver-orders-sidebar .sidebar-header::before {
                 content: "";
                 display: block;
-                width: 38px;
-                height: 4px;
+                width: 44px;
+                height: 5px;
                 border-radius: 99px;
                 background: #CBD5E1;
-                margin: 0 auto 4px auto;
+                margin: 0 auto 6px auto;
+                cursor: pointer;
             }
 
             .driver-orders-sidebar .sidebar-top-bar {
@@ -1119,10 +1213,30 @@ $earnings = fetch_driver_earnings($conn);
                 font-size: 16px;
             }
 
-            .driver-orders-sidebar .sidebar-collapse-btn {
+            .driver-orders-sidebar .sidebar-top-btn {
                 width: 30px;
                 height: 30px;
                 border-radius: 8px;
+            }
+
+            .driver-orders-sidebar .sidebar-maximize-btn {
+                display: inline-flex;
+            }
+
+            .driver-orders-sidebar.sidebar-maximized .sidebar-maximize-btn .icon-maximize {
+                display: none !important;
+            }
+
+            .driver-orders-sidebar.sidebar-maximized .sidebar-maximize-btn .icon-minimize {
+                display: block !important;
+            }
+
+            .driver-orders-sidebar:not(.sidebar-maximized) .sidebar-maximize-btn .icon-maximize {
+                display: block !important;
+            }
+
+            .driver-orders-sidebar:not(.sidebar-maximized) .sidebar-maximize-btn .icon-minimize {
+                display: none !important;
             }
 
             .driver-orders-sidebar .sidebar-search-row {
@@ -1163,6 +1277,11 @@ $earnings = fetch_driver_earnings($conn);
             }
 
             .driver-orders-sidebar .sidebar-store-list {
+                /* The shared mobile stylesheet caps generic sidebars to 46vh.
+                   Let this list use the driver's current panel height instead,
+                   including when the panel is maximized. */
+                min-height: 0;
+                max-height: none;
                 padding: 8px 14px 18px 14px;
                 gap: 8px;
             }
@@ -1266,13 +1385,32 @@ $earnings = fetch_driver_earnings($conn);
             <div class="sidebar-header">
                 <div class="sidebar-top-bar">
                     <h2 class="sidebar-title">Driver Orders</h2>
-                    <button type="button" id="sidebar-collapse-btn" class="sidebar-collapse-btn" title="Hide sidebar"
-                        aria-label="Hide sidebar">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
-                            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="15 18 9 12 15 6"></polyline>
-                        </svg>
-                    </button>
+                    <div class="sidebar-top-actions">
+                        <button type="button" id="sidebar-maximize-btn" class="sidebar-top-btn sidebar-maximize-btn" title="Maximize orders panel"
+                            aria-label="Maximize orders panel">
+                            <svg class="icon-maximize" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+                                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="15 3 21 3 21 9"></polyline>
+                                <polyline points="9 21 3 21 3 15"></polyline>
+                                <line x1="21" y1="3" x2="14" y2="10"></line>
+                                <line x1="3" y1="21" x2="10" y2="14"></line>
+                            </svg>
+                            <svg class="icon-minimize" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+                                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
+                                <polyline points="4 14 10 14 10 20"></polyline>
+                                <polyline points="20 10 14 10 14 4"></polyline>
+                                <line x1="14" y1="10" x2="21" y2="3"></line>
+                                <line x1="10" y1="14" x2="3" y2="21"></line>
+                            </svg>
+                        </button>
+                        <button type="button" id="sidebar-collapse-btn" class="sidebar-top-btn sidebar-collapse-btn" title="Hide sidebar"
+                            aria-label="Hide sidebar">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+                                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="15 18 9 12 15 6"></polyline>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
 
                 <!-- ── Earnings Panel ── -->
@@ -1319,6 +1457,7 @@ $earnings = fetch_driver_earnings($conn);
                 <div class="sidebar-categories" id="status-filter-pills">
                     <button type="button" class="cat-pill active" data-status="all">All</button>
                     <button type="button" class="cat-pill" data-status="pending">Pending</button>
+                    <button type="button" class="cat-pill" data-status="for_pickup">Pickup</button>
                     <button type="button" class="cat-pill" data-status="delivering">Delivering</button>
                     <button type="button" class="cat-pill" data-status="completed">Completed</button>
                 </div>
@@ -1383,14 +1522,6 @@ $earnings = fetch_driver_earnings($conn);
                         </svg>
                         <span>Refresh now</span>
                     </button>
-                    <a class="menu-link" id="menu-open-google" href="<?php echo escape_value($googleMapsUrl); ?>"
-                        target="_blank" rel="noopener" <?php echo $googleMapsUrl === "" ? 'aria-disabled="true"' : ""; ?>>
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <polygon points="3 11 22 2 13 21 11 13 3 11" />
-                        </svg>
-                        <span>Open in Google Maps</span>
-                    </a>
                 </section>
 
                 <section class="menu-section">
@@ -1560,7 +1691,6 @@ $earnings = fetch_driver_earnings($conn);
         const sidebarExpandBtn = document.getElementById("sidebar-expand-btn");
         const ordersListEl = document.getElementById("driver-orders-list");
         const searchInput = document.getElementById("driver-search-input");
-        const menuOpenGoogle = document.getElementById("menu-open-google");
 
         let liveMarker = null;
         let storeMarker = null;
@@ -1616,6 +1746,13 @@ $earnings = fetch_driver_earnings($conn);
             }
         }
 
+        function routeFitOptions() {
+            const isMobileSheetOpen = window.innerWidth <= 768 && sidebar?.classList.contains("sidebar-open");
+            return isMobileSheetOpen
+                ? { paddingTopLeft: [50, 420], paddingBottomRight: [50, 50] }
+                : { padding: [50, 50] };
+        }
+
         async function drawRouteForOrder(order, mode = "store") {
             const current = latestPayload.current;
             if (!current || current.lat === null || current.lng === null || !order) {
@@ -1655,10 +1792,7 @@ $earnings = fetch_driver_earnings($conn);
                     opacity: 0.88
                 }).addTo(map);
 
-                map.fitBounds(routeLayer.getBounds(), {
-                    paddingTopLeft: [50, 420],
-                    paddingBottomRight: [50, 50]
-                });
+                map.fitBounds(routeLayer.getBounds(), routeFitOptions());
             } catch (e) {
                 routeLayer = L.polyline([start, end], {
                     color: isStore ? "#FF4D2E" : "#10B981",
@@ -1667,27 +1801,7 @@ $earnings = fetch_driver_earnings($conn);
                     opacity: 0.8
                 }).addTo(map);
 
-                map.fitBounds(routeLayer.getBounds(), {
-                    paddingTopLeft: [50, 420],
-                    paddingBottomRight: [50, 50]
-                });
-            }
-
-            updateGoogleMapsLink(current, targetLat, targetLng);
-        }
-
-        function updateGoogleMapsLink(current, targetLat, targetLng) {
-            if (menuOpenGoogle) {
-                if (current && current.lat && targetLat) {
-                    menuOpenGoogle.href = `https://www.google.com/maps/dir/?api=1&origin=${current.lat},${current.lng}&destination=${targetLat},${targetLng}&travelmode=driving`;
-                    menuOpenGoogle.removeAttribute("aria-disabled");
-                } else if (current && current.lat) {
-                    menuOpenGoogle.href = `https://www.google.com/maps?q=${current.lat},${current.lng}`;
-                    menuOpenGoogle.removeAttribute("aria-disabled");
-                } else {
-                    menuOpenGoogle.href = "#";
-                    menuOpenGoogle.setAttribute("aria-disabled", "true");
-                }
+                map.fitBounds(routeLayer.getBounds(), routeFitOptions());
             }
         }
 
@@ -1750,16 +1864,39 @@ $earnings = fetch_driver_earnings($conn);
                 const pickupAddress = order.store_address || (order.store_lat ? `Lat ${Number(order.store_lat).toFixed(4)}, Lng ${Number(order.store_lng).toFixed(4)}` : "Store location");
                 const deliveryAddress = order.delivery_address || (order.delivery_lat ? `Lat ${Number(order.delivery_lat).toFixed(4)}, Lng ${Number(order.delivery_lng).toFixed(4)}` : "Customer location");
 
+                const productPrice = Number(order.subtotal_amount) > 0 
+                    ? Number(order.subtotal_amount) 
+                    : Math.max(0, Number(order.total_amount) - Number(order.delivery_fee));
+                const deliveryFee = Number(order.delivery_fee) || 0;
+                const totalAmount = Number(order.total_amount) || 0;
+
                 let actionHtml = "";
                 if (order.status === "pending") {
                     actionHtml = `
                         <button type="button" class="driver-btn btn-primary" data-action="accept" data-order-id="${order.id}">Accept</button>
                         <button type="button" class="driver-btn btn-decline" data-action="decline" data-order-id="${order.id}">Decline</button>
                     `;
+                } else if (order.status === "for_pickup") {
+                    actionHtml = `
+                        <button type="button" class="driver-btn btn-route" data-action="route-store" data-order-id="${order.id}">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+                            Route to store
+                        </button>
+                        <button type="button" class="driver-btn btn-primary" data-action="pickup" data-order-id="${order.id}">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                            Picked up
+                        </button>
+                    `;
                 } else if (order.status === "delivering") {
                     actionHtml = `
-                        <button type="button" class="driver-btn" data-action="route-delivery" data-order-id="${order.id}">Route to customer</button>
-                        <button type="button" class="driver-btn btn-success" data-action="complete" data-order-id="${order.id}">Complete</button>
+                        <button type="button" class="driver-btn btn-route" data-action="route-delivery" data-order-id="${order.id}">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+                            Route to customer
+                        </button>
+                        <button type="button" class="driver-btn btn-success" data-action="complete" data-order-id="${order.id}">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            Complete
+                        </button>
                     `;
                 }
 
@@ -1789,26 +1926,43 @@ $earnings = fetch_driver_earnings($conn);
                             </div>
                         </div>
 
-                        ${items.length ? `<div style="font-size:12.5px; color:#64748B;"><strong>Items:</strong> ${itemSummary}</div>` : ''}
+                        ${items.length ? `<div style="font-size:12.5px; color:#64748B; margin-top:2px;"><strong>Items:</strong> ${itemSummary}</div>` : ''}
 
-                        <div class="driver-order-amount">
-                            <span>Delivery fee: ${formatMoney(order.delivery_fee)}</span>
-                            <span class="driver-order-total">${formatMoney(order.total_amount)}</span>
+                        <div class="driver-price-breakdown">
+                            <div class="driver-price-row">
+                                <span class="driver-price-label">Product price:</span>
+                                <span class="driver-price-val">${formatMoney(productPrice)}</span>
+                            </div>
+                            <div class="driver-price-row">
+                                <span class="driver-price-label">Delivery fee:</span>
+                                <span class="driver-price-val highlight-fee">${formatMoney(deliveryFee)}</span>
+                            </div>
+                            <div class="driver-price-row driver-price-total">
+                                <span class="driver-price-label">Total Amount:</span>
+                                <strong class="driver-order-total">${formatMoney(totalAmount)}</strong>
+                            </div>
                         </div>
 
+                        ${actionHtml ? `
                         <div class="driver-actions-grid">
                             ${actionHtml}
                         </div>
+                        ` : ''}
                     </article>
                 `;
             }).join("");
 
             if (!selectedOrderId) {
-                const first = list.find(o => o.status === "delivering");
+                const first = list.find(o => o.status === "delivering") || list.find(o => o.status === "for_pickup");
                 if (first) {
                     selectedOrderId = first.id;
-                    selectedRouteMode = "delivery";
+                    selectedRouteMode = first.status === "delivering" ? "delivery" : "store";
                     drawRouteForOrder(first, selectedRouteMode);
+                }
+            } else {
+                const sel = list.find(o => o.id === selectedOrderId);
+                if (sel) {
+                    drawRouteForOrder(sel, selectedRouteMode);
                 }
             }
         }
@@ -1951,6 +2105,7 @@ $earnings = fetch_driver_earnings($conn);
             document.body.classList.add("sidebar-collapsed");
             if (sidebar) {
                 sidebar.classList.remove("sidebar-open");
+                sidebar.classList.remove("sidebar-maximized");
             }
             if (sidebarExpandBtn) {
                 sidebarExpandBtn.hidden = false;
@@ -1967,6 +2122,29 @@ $earnings = fetch_driver_earnings($conn);
                 sidebarExpandBtn.hidden = true;
             }
             setTimeout(() => map.invalidateSize(), 360);
+        }
+
+        const sidebarMaximizeBtn = document.getElementById("sidebar-maximize-btn");
+        function toggleMaximizeSidebar() {
+            if (!sidebar) return;
+            sidebar.classList.toggle("sidebar-maximized");
+            setTimeout(() => map.invalidateSize(), 360);
+        }
+
+        if (sidebarMaximizeBtn) {
+            sidebarMaximizeBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                toggleMaximizeSidebar();
+            });
+        }
+
+        const sidebarHeader = document.querySelector(".driver-orders-sidebar .sidebar-header");
+        if (sidebarHeader) {
+            sidebarHeader.addEventListener("click", (e) => {
+                if (window.innerWidth <= 768 && (e.target === sidebarHeader || e.target.classList.contains("sidebar-top-bar") || e.target.classList.contains("sidebar-title"))) {
+                    toggleMaximizeSidebar();
+                }
+            });
         }
 
         if (sidebarCollapseBtn && sidebarExpandBtn) {
@@ -2051,8 +2229,19 @@ $earnings = fetch_driver_earnings($conn);
                 if (action === "route-store" || action === "route-delivery") {
                     selectedOrderId = orderId;
                     selectedRouteMode = action === "route-delivery" ? "delivery" : "store";
-                    drawRouteForOrder(order, selectedRouteMode);
                     renderOrders(latestPayload.orders || []);
+
+                    // Close the mobile sheet before fitting the route so the map
+                    // is fully visible as navigation begins.
+                    if (window.innerWidth <= 768 && sidebar?.classList.contains("sidebar-open")) {
+                        collapseOrdersSidebar();
+                        window.setTimeout(() => {
+                            map.invalidateSize();
+                            drawRouteForOrder(order, selectedRouteMode);
+                        }, 360);
+                    } else {
+                        drawRouteForOrder(order, selectedRouteMode);
+                    }
                     return;
                 }
 
@@ -2061,6 +2250,14 @@ $earnings = fetch_driver_earnings($conn);
                     confirmOrderId.textContent = orderId;
                     openModal(confirmModal);
                     return;
+                }
+
+                if (action === "accept") {
+                    selectedOrderId = orderId;
+                    selectedRouteMode = "store";
+                } else if (action === "pickup") {
+                    selectedOrderId = orderId;
+                    selectedRouteMode = "delivery";
                 }
 
                 submitOrderAction(orderId, action);

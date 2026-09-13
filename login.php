@@ -82,7 +82,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login</title>
-    <link rel="stylesheet" href="assets/styles.css?v=large-logo-1">
+    <link rel="stylesheet" href="assets/styles.css?v=logo-mobile-fix-1">
 </head>
 <body class="login-page">
     <main class="auth-shell">

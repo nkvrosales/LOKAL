@@ -144,7 +144,7 @@ if ($list_stmt) {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Store Products | Lokal</title>
 <link rel="stylesheet" href="assets/styles.css?v=primary-bw-icons-1">
-<link rel="stylesheet" href="assets/store-admin.css?v=products-modal-1">
+<link rel="stylesheet" href="assets/store-admin.css?v=responsive-tabs-v5">
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css">
 <style>
 /* ── Overrides for DataTables to match design ── */
@@ -215,11 +215,25 @@ table.products-dt tbody td{padding:11px 14px;border-bottom:1px solid #F1F5F9;ver
 .pm-cancel:hover{background:#F1F5F9}
 .pm-save{padding:10px 22px;border-radius:12px;border:none;background:linear-gradient(135deg,#FF5B2E,#e04a1f);color:#fff;font:inherit;font-size:13.5px;font-weight:700;cursor:pointer;box-shadow:none;transition:filter .15s;display:inline-flex;align-items:center;gap:7px}
 .pm-save:hover{transform:none;filter:brightness(.92);box-shadow:none}
-@media(max-width:768px){
-  .top-bar{flex-direction:column;align-items:stretch;padding:10px 14px;gap:8px}
-  .store-admin-nav{border-radius:12px;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none;width:100%;box-sizing:border-box}
+@media(max-width:900px){
+  .top-bar{flex-direction:column;align-items:stretch;padding:10px 18px;gap:10px}
+  .top-bar .logo{align-self:flex-start}
+  .store-admin-nav{display:flex;width:100%;border-radius:999px;padding:3px;gap:3px;box-sizing:border-box;background:#F1F5F9;border:1px solid #E2E8F0;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;justify-content:space-between}
   .store-admin-nav::-webkit-scrollbar{display:none}
-  .store-admin-tab{white-space:nowrap;flex-shrink:0;padding:6px 12px;font-size:12px}
+  .store-admin-tab{flex:1 1 auto;min-width:0;white-space:nowrap;padding:7px 8px;font-size:12.5px;gap:4px;justify-content:center;text-align:center;border-radius:999px}
+  .store-admin-tab svg{width:14px;height:14px;flex-shrink:0}
+  .store-admin-tab span{white-space:nowrap}
+}
+@media(max-width:640px){
+  .top-bar{padding:10px 12px;gap:8px}
+  .store-admin-nav{padding:3px;gap:2px}
+  .store-admin-tab{padding:6px 5px;font-size:11.5px;gap:3px}
+  .store-admin-tab svg{width:13.5px;height:13.5px}
+}
+@media(max-width:380px){
+  .top-bar{padding:8px 6px;gap:6px}
+  .store-admin-tab{padding:6px 3px;font-size:10.5px;gap:2.5px}
+  .store-admin-tab svg{width:12px;height:12px}
 }
 
 /* Dropdown action button */

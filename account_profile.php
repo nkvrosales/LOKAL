@@ -561,7 +561,7 @@ if ($isStore) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Account Profile | Lokal</title>
     <link rel="stylesheet" href="assets/styles.css?v=primary-bw-icons-1">
-    <link rel="stylesheet" href="assets/store-admin.css?v=mobile-responsive-profile-2">
+    <link rel="stylesheet" href="assets/store-admin.css?v=responsive-tabs-v5">
     <?php if (!$isDriver): ?>
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
     <?php endif; ?>
@@ -678,17 +678,23 @@ if ($isStore) {
         }
         .address-autofill-wrap {
             position: relative;
+            width: 100%;
         }
         .address-suggestions {
-            position: fixed;
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            right: 0;
+            width: 100%;
             background: #fff;
             border: 1px solid #CBD5E1;
             border-radius: 10px;
-            box-shadow: none;
-            z-index: 999999;
+            box-shadow: 0 10px 28px rgba(0,0,0,.15);
+            z-index: 99999;
             overflow-y: auto;
             display: none;
             max-height: 240px;
+            box-sizing: border-box;
         }
         .address-suggestions.open {
             display: block;
@@ -713,9 +719,11 @@ if ($isStore) {
         }
         .address-suggestion-item .sug-icon {
             flex-shrink: 0;
-            margin-top: 1px;
+            margin-top: 2px;
             color: #ff5b2e;
-            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
         }
         .address-suggestion-item .sug-text {
             line-height: 1.4;
@@ -748,33 +756,88 @@ if ($isStore) {
         }
         @keyframes spin { to { transform: translateY(-50%) rotate(360deg); } }
 
-        @media (max-width: 768px) {
+        @media (max-width: 900px) {
             .top-bar {
-                padding: 10px 14px;
+                padding: 10px 18px;
                 flex-direction: column;
                 align-items: stretch;
-                gap: 8px;
+                gap: 10px;
+            }
+            .top-bar .logo {
+                align-self: flex-start;
             }
             .store-admin-nav {
-                border-radius: 12px;
+                display: flex;
+                width: 100%;
+                border-radius: 999px;
                 padding: 3px;
                 gap: 3px;
+                box-sizing: border-box;
+                background: #F1F5F9;
+                border: 1px solid #E2E8F0;
                 overflow-x: auto;
-                flex-wrap: nowrap;
                 -webkit-overflow-scrolling: touch;
                 scrollbar-width: none;
-                width: 100%;
-                box-sizing: border-box;
+                justify-content: space-between;
             }
             .store-admin-nav::-webkit-scrollbar {
                 display: none;
             }
             .store-admin-tab {
+                flex: 1 1 auto;
+                min-width: 0;
                 white-space: nowrap;
-                flex-shrink: 0;
-                padding: 6px 12px;
-                font-size: 12px;
+                padding: 7px 8px;
+                font-size: 12.5px;
+                gap: 4px;
+                justify-content: center;
+                text-align: center;
+                border-radius: 999px;
             }
+            .store-admin-tab svg {
+                width: 14px;
+                height: 14px;
+                flex-shrink: 0;
+            }
+            .store-admin-tab span {
+                white-space: nowrap;
+            }
+        }
+        @media (max-width: 640px) {
+            .top-bar {
+                padding: 10px 12px;
+                gap: 8px;
+            }
+            .store-admin-nav {
+                padding: 3px;
+                gap: 2px;
+            }
+            .store-admin-tab {
+                padding: 6px 5px;
+                font-size: 11.5px;
+                gap: 3px;
+            }
+            .store-admin-tab svg {
+                width: 13.5px;
+                height: 13.5px;
+            }
+        }
+        @media (max-width: 380px) {
+            .top-bar {
+                padding: 8px 6px;
+                gap: 6px;
+            }
+            .store-admin-tab {
+                padding: 6px 3px;
+                font-size: 10.5px;
+                gap: 2.5px;
+            }
+            .store-admin-tab svg {
+                width: 12px;
+                height: 12px;
+            }
+        }
+        @media (max-width: 768px) {
             .store-admin-shell {
                 padding: 12px 10px;
                 width: 100%;
@@ -1513,18 +1576,9 @@ if ($isStore) {
 
                 if (!addrInput || !addrSugBox) return;
 
-                document.body.appendChild(addrSugBox);
-
                 let debounceTimer  = null;
                 let activeIndex    = -1;
                 let currentResults = [];
-
-                function positionDropdown() {
-                    const rect = addrInput.getBoundingClientRect();
-                    addrSugBox.style.top   = (rect.bottom + window.scrollY + 4) + "px";
-                    addrSugBox.style.left  = (rect.left + window.scrollX) + "px";
-                    addrSugBox.style.width = rect.width + "px";
-                }
 
                 function showSpinner(show) {
                     addrSpinner && addrSpinner.classList.toggle("visible", show);
@@ -1544,7 +1598,7 @@ if ($isStore) {
                     if (!results.length) {
                         const empty = document.createElement("div");
                         empty.className = "address-suggestion-item";
-                        empty.innerHTML = `<span class="sug-icon">&#9888;</span><span class="sug-text"><strong>No results found</strong><span>Try a more specific address</span></span>`;
+                        empty.innerHTML = `<span class="sug-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span><span class="sug-text"><strong>No results found</strong><span>Try a more specific address</span></span>`;
                         addrSugBox.appendChild(empty);
                     } else {
                         results.forEach((r, i) => {
@@ -1555,7 +1609,7 @@ if ($isStore) {
                             item.className  = "address-suggestion-item";
                             item.setAttribute("role", "option");
                             item.setAttribute("data-index", i);
-                            item.innerHTML  = `<span class="sug-icon">&#128205;</span><span class="sug-text"><strong>${primary}</strong><span>${secondary}</span></span>`;
+                            item.innerHTML  = `<span class="sug-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg></span><span class="sug-text"><strong>${primary}</strong><span>${secondary}</span></span>`;
                             item.addEventListener("mousedown", (e) => {
                                 e.preventDefault();
                                 selectResult(i);
@@ -1563,7 +1617,6 @@ if ($isStore) {
                             addrSugBox.appendChild(item);
                         });
                     }
-                    positionDropdown();
                     addrSugBox.classList.add("open");
                 }
 
@@ -1635,13 +1688,6 @@ if ($isStore) {
 
                 addrInput.addEventListener("blur", () => {
                     setTimeout(closeSuggestions, 180);
-                });
-
-                window.addEventListener("scroll", () => {
-                    if (addrSugBox.classList.contains("open")) positionDropdown();
-                }, true);
-                window.addEventListener("resize", () => {
-                    if (addrSugBox.classList.contains("open")) positionDropdown();
                 });
             })();
         </script>

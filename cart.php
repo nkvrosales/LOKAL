@@ -138,7 +138,7 @@ if ($store_ids) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cart | Lokal</title>
     <link rel="stylesheet" href="assets/styles.css?v=primary-bw-icons-1">
-    <link rel="stylesheet" href="assets/store-admin.css?v=cart-page-1">
+    <link rel="stylesheet" href="assets/store-admin.css?v=responsive-tabs-v5">
     <link rel="stylesheet" href="assets/home.css?v=cart-page-1">
 </head>
 <body class="cart-screen store-admin-body">

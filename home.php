@@ -256,11 +256,27 @@ if (empty($sidebar_categories)) {
                 <div class="sidebar-header">
                     <div class="sidebar-top-bar">
                         <h2 class="sidebar-title">Lokal Stores</h2>
-                        <button type="button" id="sidebar-collapse-btn" class="sidebar-collapse-btn" title="Hide sidebar" aria-label="Hide sidebar">
-                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="15 18 9 12 15 6"></polyline>
-                            </svg>
-                        </button>
+                        <div class="sidebar-top-actions">
+                            <button type="button" id="sidebar-maximize-btn" class="sidebar-maximize-btn" title="Expand stores panel" aria-label="Expand stores panel">
+                                <svg class="icon-maximize" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="15 3 21 3 21 9"></polyline>
+                                    <polyline points="9 21 3 21 3 15"></polyline>
+                                    <line x1="21" y1="3" x2="14" y2="10"></line>
+                                    <line x1="3" y1="21" x2="10" y2="14"></line>
+                                </svg>
+                                <svg class="icon-minimize" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
+                                    <polyline points="4 14 10 14 10 20"></polyline>
+                                    <polyline points="20 10 14 10 14 4"></polyline>
+                                    <line x1="14" y1="10" x2="21" y2="3"></line>
+                                    <line x1="10" y1="14" x2="3" y2="21"></line>
+                                </svg>
+                            </button>
+                            <button type="button" id="sidebar-collapse-btn" class="sidebar-collapse-btn" title="Hide sidebar" aria-label="Hide sidebar">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="15 18 9 12 15 6"></polyline>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
 
                     <div class="sidebar-search-row">
@@ -305,6 +321,15 @@ if (empty($sidebar_categories)) {
                 <span></span>
                 <span></span>
                 <span></span>
+            </button>
+
+            <!-- Recenter GPS Action Button -->
+            <button type="button" class="map-locate-action" id="map-recenter-btn" title="Center GPS location"
+                aria-label="Center GPS location">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
+                </svg>
             </button>
 
 
@@ -1498,13 +1523,43 @@ if (empty($sidebar_categories)) {
                 });
             }
 
+            const mapRecenterBtn = document.getElementById("map-recenter-btn");
+            if (mapRecenterBtn) {
+                mapRecenterBtn.addEventListener("click", () => {
+                    if (locateBtn) {
+                        locateBtn.click();
+                    } else if ("geolocation" in navigator) {
+                        setStatus("Locating your current position...");
+                        navigator.geolocation.getCurrentPosition(
+                            (pos) => {
+                                const lat = pos.coords.latitude;
+                                const lng = pos.coords.longitude;
+                                map.flyTo([lat, lng], 16, { duration: 0.6 });
+                                setStatus("Showing your location.");
+                            },
+                            () => {
+                                setStatus("Could not access your location. Please check browser permissions.");
+                            },
+                            { enableHighAccuracy: true, timeout: 10000 }
+                        );
+                    }
+                });
+            }
+
             const sidebarStoreList = document.getElementById("sidebar-store-list");
             if (sidebarStoreList) {
                 sidebarStoreList.addEventListener("click", (e) => {
                     const btn = e.target.closest("[data-action='show-on-map']");
                     if (!btn) return;
                     const storeId = btn.dataset.storeId;
-                    focusStore(storeId);
+                    // On phones, reveal the complete map before centering the
+                    // selected store so its pin and surrounding area are visible.
+                    if (window.innerWidth <= 768 && storeSidebar?.classList.contains("sidebar-open")) {
+                        collapseSidebar();
+                        window.setTimeout(() => focusStore(storeId), 340);
+                    } else {
+                        focusStore(storeId);
+                    }
                 });
             }
 
@@ -1512,11 +1567,13 @@ if (empty($sidebar_categories)) {
             const storeSidebar = document.getElementById("store-sidebar");
             const sidebarCollapseBtn = document.getElementById("sidebar-collapse-btn");
             const sidebarExpandBtn = document.getElementById("sidebar-expand-btn");
+            const sidebarMaximizeBtn = document.getElementById("sidebar-maximize-btn");
 
             function collapseSidebar() {
                 if (!storeSidebar) return;
                 document.body.classList.add("sidebar-collapsed");
                 storeSidebar.classList.remove("sidebar-open");
+                storeSidebar.classList.remove("sidebar-maximized");
                 if (sidebarExpandBtn) {
                     sidebarExpandBtn.hidden = false;
                 }
@@ -1543,6 +1600,13 @@ if (empty($sidebar_categories)) {
 
             if (sidebarCollapseBtn) {
                 sidebarCollapseBtn.addEventListener("click", collapseSidebar);
+            }
+            if (sidebarMaximizeBtn) {
+                sidebarMaximizeBtn.addEventListener("click", (event) => {
+                    event.stopPropagation();
+                    storeSidebar?.classList.toggle("sidebar-maximized");
+                    setTimeout(() => map.invalidateSize(), 360);
+                });
             }
             if (sidebarExpandBtn) {
                 sidebarExpandBtn.addEventListener("click", () => {
@@ -1627,6 +1691,30 @@ if (empty($sidebar_categories)) {
                         setStatus("No saved store pin yet. Set it in Profile.");
                     }
                     closeMenu();
+                });
+            }
+
+            const storeRecenterBtn = document.getElementById("map-recenter-btn");
+            if (storeRecenterBtn) {
+                storeRecenterBtn.addEventListener("click", () => {
+                    if (storePinMarker) {
+                        map.flyTo(storePinMarker.getLatLng(), 15, { duration: 0.45 });
+                        setStatus("Showing your store pin.");
+                    } else if ("geolocation" in navigator) {
+                        setStatus("Locating your current position...");
+                        navigator.geolocation.getCurrentPosition(
+                            (pos) => {
+                                map.flyTo([pos.coords.latitude, pos.coords.longitude], 15, { duration: 0.45 });
+                                setStatus("Centered on your location.");
+                            },
+                            () => {
+                                setStatus("Could not access your location. Please check browser permissions.");
+                            },
+                            { enableHighAccuracy: true, timeout: 10000 }
+                        );
+                    } else {
+                        setStatus("No saved store pin yet. Set it in Profile.");
+                    }
                 });
             }
         }

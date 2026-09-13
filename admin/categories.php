@@ -27,19 +27,37 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         } elseif ($tag === "") {
             $errors[] = "Could not generate a valid tag from that name.";
         } else {
-            $stmt = $mysqli->prepare(
-                "INSERT INTO categories (name, slug, is_active, sort_order) VALUES (?, ?, 1, ?)"
-            );
-            if ($stmt) {
-                $stmt->bind_param("ssi", $name, $tag, $order);
-                if ($stmt->execute()) {
-                    $flash[] = "Category \"" . htmlspecialchars($name) . "\" added.";
-                } else {
-                    $errors[] = $mysqli->errno === 1062
-                        ? "A category with that tag already exists."
+            // Check if slug already exists
+            $check = $mysqli->prepare("SELECT id FROM categories WHERE slug = ? LIMIT 1");
+            if ($check) {
+                $check->bind_param("s", $tag);
+                $check->execute();
+                $check->store_result();
+                if ($check->num_rows > 0) {
+                    $errors[] = "A category with the tag \"$tag\" already exists.";
+                }
+                $check->close();
+            }
+
+            if (!$errors) {
+                try {
+                    $stmt = $mysqli->prepare(
+                        "INSERT INTO categories (name, slug, is_active, sort_order) VALUES (?, ?, 1, ?)"
+                    );
+                    if ($stmt) {
+                        $stmt->bind_param("ssi", $name, $tag, $order);
+                        if ($stmt->execute()) {
+                            $flash[] = "Category \"" . htmlspecialchars($name) . "\" added.";
+                        } else {
+                            $errors[] = "Could not add category.";
+                        }
+                        $stmt->close();
+                    }
+                } catch (mysqli_sql_exception $e) {
+                    $errors[] = $e->getCode() === 1062
+                        ? "A category with the tag \"$tag\" already exists."
                         : "Could not add category.";
                 }
-                $stmt->close();
             }
         }
     }
@@ -56,19 +74,37 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         if ($tag === "")  { $errors[] = "Tag is required."; }
 
         if (!$errors) {
-            $stmt = $mysqli->prepare(
-                "UPDATE categories SET name = ?, slug = ?, sort_order = ? WHERE id = ?"
-            );
-            if ($stmt) {
-                $stmt->bind_param("ssii", $name, $tag, $order, $id);
-                if ($stmt->execute()) {
-                    $flash[] = "Category updated.";
-                } else {
-                    $errors[] = $mysqli->errno === 1062
-                        ? "A category with that tag already exists."
+            // Check if slug already exists for another category
+            $check = $mysqli->prepare("SELECT id FROM categories WHERE slug = ? AND id != ? LIMIT 1");
+            if ($check) {
+                $check->bind_param("si", $tag, $id);
+                $check->execute();
+                $check->store_result();
+                if ($check->num_rows > 0) {
+                    $errors[] = "A category with the tag \"$tag\" already exists.";
+                }
+                $check->close();
+            }
+
+            if (!$errors) {
+                try {
+                    $stmt = $mysqli->prepare(
+                        "UPDATE categories SET name = ?, slug = ?, sort_order = ? WHERE id = ?"
+                    );
+                    if ($stmt) {
+                        $stmt->bind_param("ssii", $name, $tag, $order, $id);
+                        if ($stmt->execute()) {
+                            $flash[] = "Category updated.";
+                        } else {
+                            $errors[] = "Could not update category.";
+                        }
+                        $stmt->close();
+                    }
+                } catch (mysqli_sql_exception $e) {
+                    $errors[] = $e->getCode() === 1062
+                        ? "A category with the tag \"$tag\" already exists."
                         : "Could not update category.";
                 }
-                $stmt->close();
             }
         }
     }
@@ -77,14 +113,18 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     if ($action === "toggle") {
         $id = (int) ($_POST["id"] ?? 0);
         if ($id > 0) {
-            $stmt = $mysqli->prepare(
-                "UPDATE categories SET is_active = 1 - is_active WHERE id = ?"
-            );
-            if ($stmt) {
-                $stmt->bind_param("i", $id);
-                $stmt->execute();
-                $stmt->close();
-                $flash[] = "Category status updated.";
+            try {
+                $stmt = $mysqli->prepare(
+                    "UPDATE categories SET is_active = 1 - is_active WHERE id = ?"
+                );
+                if ($stmt) {
+                    $stmt->bind_param("i", $id);
+                    $stmt->execute();
+                    $stmt->close();
+                    $flash[] = "Category status updated.";
+                }
+            } catch (mysqli_sql_exception $e) {
+                $errors[] = "Could not update category status.";
             }
         }
     }
@@ -93,12 +133,16 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     if ($action === "delete") {
         $id = (int) ($_POST["id"] ?? 0);
         if ($id > 0) {
-            $stmt = $mysqli->prepare("DELETE FROM categories WHERE id = ?");
-            if ($stmt) {
-                $stmt->bind_param("i", $id);
-                $stmt->execute();
-                $stmt->close();
-                $flash[] = "Category deleted.";
+            try {
+                $stmt = $mysqli->prepare("DELETE FROM categories WHERE id = ?");
+                if ($stmt) {
+                    $stmt->bind_param("i", $id);
+                    $stmt->execute();
+                    $stmt->close();
+                    $flash[] = "Category deleted.";
+                }
+            } catch (mysqli_sql_exception $e) {
+                $errors[] = "Cannot delete this category because it is in use by products.";
             }
         }
     }
@@ -128,6 +172,9 @@ $showAddModal = !empty($errors) && ($_POST["action"] ?? "") === "add";
     <link rel="stylesheet" href="../assets/styles.css?v=cat-2">
     <link rel="stylesheet" href="../assets/store-admin.css?v=cat-2">
     <link rel="stylesheet" href="assets/admin.css?v=cat-2">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         /* ── Shared modal backdrop ───────────────────────────────────── */
         .cat-modal-backdrop {
@@ -149,8 +196,9 @@ $showAddModal = !empty($errors) && ($_POST["action"] ?? "") === "add";
         }
         .cat-modal-panel h2 {
             margin: 0;
-            font-family: "Cinzel","Georgia",serif;
+            font-family: "Plus Jakarta Sans", system-ui, sans-serif;
             font-size: 17px;
+            font-weight: 700;
             color: #FF5B2E;
         }
         .cat-modal-field { display: grid; gap: 4px; }
@@ -206,9 +254,31 @@ $showAddModal = !empty($errors) && ($_POST["action"] ?? "") === "add";
             padding: 11px 16px;
             border-radius: 10px;
             font-size: 13.5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
         .cat-notice.success { background: rgba(34,197,94,.12); color: #15803d; }
         .cat-notice.error   { background: rgba(239,68,68,.1);  color: #b91c1c; }
+        .cat-notice-dismiss {
+            margin-left: auto;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(0, 0, 0, 0.08);
+            color: currentColor;
+            font-size: 15px;
+            line-height: 1;
+            cursor: pointer;
+            flex-shrink: 0;
+            padding: 0;
+            transition: background 0.15s;
+        }
+        .cat-notice-dismiss:hover { background: rgba(0, 0, 0, 0.16); }
 
         /* ── Section top actions ─────────────────────────────────────── */
         .cat-section-actions { display: flex; gap: 10px; align-items: center; }
@@ -269,15 +339,21 @@ $showAddModal = !empty($errors) && ($_POST["action"] ?? "") === "add";
             </div>
 
             <?php if ($flash): ?>
-                <?php foreach ($flash as $msg): ?>
-                    <div class="cat-notice success"><?php echo $msg; ?></div>
+                <?php foreach ($flash as $idx => $msg): ?>
+                    <div class="cat-notice success cat-banner" id="cat-flash-<?php echo $idx; ?>">
+                        <span><?php echo $msg; ?></span>
+                        <button class="cat-notice-dismiss" onclick="dismissCatNotice('cat-flash-<?php echo $idx; ?>')" type="button" aria-label="Dismiss">&times;</button>
+                    </div>
                 <?php endforeach; ?>
             <?php endif; ?>
             <?php if ($errors && !$showAddModal): ?>
-                <div class="cat-notice error">
-                    <?php foreach ($errors as $err): ?>
-                        <div><?php echo escape($err); ?></div>
-                    <?php endforeach; ?>
+                <div class="cat-notice error cat-banner" id="cat-banner-error">
+                    <div style="flex:1;">
+                        <?php foreach ($errors as $err): ?>
+                            <div><?php echo escape($err); ?></div>
+                        <?php endforeach; ?>
+                    </div>
+                    <button class="cat-notice-dismiss" onclick="dismissCatNotice('cat-banner-error')" type="button" aria-label="Dismiss">&times;</button>
                 </div>
             <?php endif; ?>
 
@@ -434,6 +510,22 @@ $showAddModal = !empty($errors) && ($_POST["action"] ?? "") === "add";
 
         document.addEventListener("keydown", e => {
             if (e.key === "Escape") { closeAddModal(); closeEditModal(); }
+        });
+
+        function dismissCatNotice(id) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.style.transition = "opacity 0.25s ease, transform 0.25s ease";
+            el.style.opacity = "0";
+            el.style.transform = "translateY(-4px)";
+            setTimeout(() => el.remove(), 260);
+            if (window.history.replaceState) {
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        }
+
+        document.querySelectorAll(".cat-banner").forEach(el => {
+            setTimeout(() => dismissCatNotice(el.id), 5000);
         });
     </script>
 </body>

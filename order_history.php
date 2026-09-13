@@ -187,7 +187,7 @@ function status_badge_info(string $s): array {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Orders | Lokal</title>
     <link rel="stylesheet" href="assets/styles.css?v=primary-bw-icons-1">
-    <link rel="stylesheet" href="assets/store-admin.css?v=orders-3">
+    <link rel="stylesheet" href="assets/store-admin.css?v=responsive-tabs-v5">
     <style>
     /* â”€â”€ Order cards â”€â”€ */
     .oh-card { max-width: 860px; }

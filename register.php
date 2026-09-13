@@ -61,10 +61,30 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $errors[] = "Last name is required.";
     }
     if ($values["contact"] === "") {
-        $errors[] = "Contact is required.";
+        $errors[] = "Phone number is required.";
+    } elseif (!preg_match('/^[0-9]+$/', $values["contact"])) {
+        $errors[] = "Phone number must contain numbers only.";
+    } elseif (strlen($values["contact"]) < 10 || strlen($values["contact"]) > 11) {
+        $errors[] = "Phone number must be 10 or 11 digits (e.g. 09123456789).";
     }
-    if (!filter_var($values["email"], FILTER_VALIDATE_EMAIL)) {
-        $errors[] = "A valid email is required.";
+
+    if ($values["email"] === "") {
+        $errors[] = "Email address is required.";
+    } elseif (!filter_var($values["email"], FILTER_VALIDATE_EMAIL)) {
+        $errors[] = "Please enter a valid email address (e.g. juan@example.com).";
+    } else {
+        $check = $mysqli->prepare("SELECT id FROM users WHERE email = ? LIMIT 1");
+        if ($check) {
+            $check->bind_param("s", $values["email"]);
+            $check->execute();
+            $check->store_result();
+            if ($check->num_rows > 0) {
+                $errors[] = "The email \"" . htmlspecialchars($values["email"]) . "\" is already registered. Please sign in or use another email.";
+            }
+            $check->close();
+        } else {
+            $errors[] = "Unable to validate email at this time.";
+        }
     }
     if ($values["account_type"] === "user") {
         if ($values["user_address"] === "") {
@@ -151,21 +171,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     }
     if ($password !== $confirm_password) {
         $errors[] = "Passwords do not match.";
-    }
-
-    if (!$errors) {
-        $check = $mysqli->prepare("SELECT id FROM users WHERE email = ?");
-        if ($check) {
-            $check->bind_param("s", $values["email"]);
-            $check->execute();
-            $check->store_result();
-            if ($check->num_rows > 0) {
-                $errors[] = "Email is already registered.";
-            }
-            $check->close();
-        } else {
-            $errors[] = "Unable to validate email.";
-        }
     }
 
     if (!$errors) {
@@ -259,9 +264,19 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 $id_image_filename,
                 $profile_image_filename
             );
-            if ($stmt->execute()) {
-                header("Location: login.php?registered=1");
-                exit;
+            try {
+                if ($stmt->execute()) {
+                    header("Location: login.php?registered=1");
+                    exit;
+                } else {
+                    $errors[] = "Registration failed. Please try again.";
+                }
+            } catch (mysqli_sql_exception $e) {
+                if ($e->getCode() === 1062) {
+                    $errors[] = "The email \"" . htmlspecialchars($values["email"]) . "\" is already registered. Please sign in or use another email.";
+                } else {
+                    $errors[] = "Registration error: " . $e->getMessage();
+                }
             }
             $stmt->close();
         }
@@ -344,6 +359,20 @@ if ($cat_res) {
             margin-bottom: 8px;
             padding-bottom: 8px;
             border-bottom: 1px solid #F1F5F9;
+        }
+
+        .reg-errors {
+            background: #FEF2F2;
+            border: 1.5px solid #FCA5A5;
+            border-radius: 10px;
+            padding: 10px 14px;
+            margin-bottom: 8px;
+            color: #991B1B;
+            font-size: 12.5px;
+            font-weight: 600;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
         }
 
         .reg-header-titles h1 {
@@ -839,7 +868,11 @@ if ($cat_res) {
             width: 100%;
         }
         .address-suggestions {
-            position: fixed;
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            right: 0;
+            width: 100%;
             background: #fff;
             border: 1px solid rgba(255, 91, 46, .28);
             border-radius: 10px;
@@ -848,6 +881,7 @@ if ($cat_res) {
             overflow-y: auto;
             display: none;
             max-height: 180px;
+            box-sizing: border-box;
         }
         .address-suggestions.open {
             display: block;
@@ -872,9 +906,11 @@ if ($cat_res) {
         }
         .address-suggestion-item .sug-icon {
             flex-shrink: 0;
-            margin-top: 1px;
+            margin-top: 2px;
             color: #ff5b2e;
-            font-size: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
         }
         .address-suggestion-item .sug-text strong {
             display: block;
@@ -902,7 +938,93 @@ if ($cat_res) {
         .address-autofill-spinner.visible {
             display: block;
         }
-        @keyframes spin { to { transform: translateY(-50%) rotate(360deg); } }
+        /* ── Store Hours Searchable Dropdown ── */
+        .hours-dropdown-wrap {
+            position: relative;
+            width: 100%;
+        }
+        .hours-dropdown-wrap input {
+            padding-right: 32px !important;
+        }
+        .hours-dropdown-arrow {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #94A3B8;
+            cursor: pointer;
+            padding: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: color 0.15s, transform 0.2s;
+        }
+        .hours-dropdown-arrow:hover {
+            color: #FF5B2E;
+        }
+        .hours-dropdown-wrap.open .hours-dropdown-arrow svg {
+            transform: rotate(180deg);
+        }
+        .hours-dropdown-menu {
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            right: 0;
+            background: #fff;
+            border: 1px solid rgba(255, 91, 46, .28);
+            border-radius: 10px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, .14);
+            z-index: 999999;
+            overflow-y: auto;
+            display: none;
+            max-height: 190px;
+            box-sizing: border-box;
+        }
+        .hours-dropdown-menu.open {
+            display: block;
+        }
+        .hours-item {
+            padding: 8px 12px;
+            font-size: 12.5px;
+            font-weight: 500;
+            color: #1E293B;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid rgba(0, 0, 0, .05);
+            transition: background 0.12s;
+        }
+        .hours-item:last-child {
+            border-bottom: none;
+        }
+        .hours-item:hover,
+        .hours-item.active,
+        .hours-item.selected {
+            background: rgba(255, 91, 46, .09);
+            color: #FF5B2E;
+        }
+        .hours-item svg {
+            flex-shrink: 0;
+            color: #FF5B2E;
+        }
+        .hours-item-badge {
+            margin-left: auto;
+            font-size: 10.5px;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: #F1F5F9;
+            color: #64748B;
+        }
+        .hours-item:hover .hours-item-badge,
+        .hours-item.selected .hours-item-badge {
+            background: rgba(255, 91, 46, .15);
+            color: #FF5B2E;
+        }
 
         /* Responsive Fallback */
         @media (max-width: 920px) {
@@ -1055,7 +1177,7 @@ if ($cat_res) {
                         <div class="reg-grid-row reg-grid-2">
                             <div class="reg-field">
                                 <label for="contact">Phone Number</label>
-                                <input type="tel" id="contact" name="contact" value="<?php echo escape($values["contact"]); ?>" placeholder="0912 345 6789" required>
+                                <input type="text" id="contact" name="contact" value="<?php echo escape($values["contact"]); ?>" placeholder="09123456789" maxlength="20" required>
                             </div>
                             <div class="reg-field">
                                 <label for="email">Email Address</label>
@@ -1124,7 +1246,13 @@ if ($cat_res) {
                             </div>
                             <div class="reg-field">
                                 <label for="store_hours">Store Hours</label>
-                                <input type="text" id="store_hours" name="store_hours" value="<?php echo escape($values["store_hours"]); ?>" placeholder="e.g. Mon-Sun, 8:00 AM - 9:00 PM" required>
+                                <div class="hours-dropdown-wrap" id="hours-dropdown-wrap">
+                                    <input type="text" id="store_hours" name="store_hours" value="<?php echo escape($values["store_hours"]); ?>" placeholder="e.g. 7am - 8pm or Mon - Sun, 5am - 6pm" autocomplete="off">
+                                    <button type="button" class="hours-dropdown-arrow" id="hours-toggle-btn" aria-label="Toggle store hours options" tabindex="-1">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                                    </button>
+                                    <div class="hours-dropdown-menu" id="hours-dropdown-menu" role="listbox" aria-label="Store hours options"></div>
+                                </div>
                             </div>
                         </div>
 
@@ -1432,6 +1560,8 @@ if ($cat_res) {
             userOnlyFields.forEach((field) => field.hidden = isStore || isDriver);
             driverOnlyFields.forEach((field) => field.hidden = !isDriver);
 
+            const storeHoursInput = document.getElementById("store_hours");
+
             if (storeAddressInput) {
                 storeAddressInput.required = isStore;
                 storeAddressInput.disabled = !isStore;
@@ -1439,6 +1569,10 @@ if ($cat_res) {
             if (storeNameInput) {
                 storeNameInput.required = isStore;
                 storeNameInput.disabled = !isStore;
+            }
+            if (storeHoursInput) {
+                storeHoursInput.required = isStore;
+                storeHoursInput.disabled = !isStore;
             }
             if (userAddressInput) {
                 userAddressInput.required = !isStore && !isDriver;
@@ -1452,6 +1586,17 @@ if ($cat_res) {
                 userLatInput.disabled = isStore || isDriver;
                 userLngInput.disabled = isStore || isDriver;
             }
+
+            // Disable all inputs in inactive role sections so browser validation never blocks hidden fields
+            document.querySelectorAll('[data-store-only] input, [data-store-only] select, [data-store-only] textarea').forEach(el => {
+                el.disabled = !isStore;
+            });
+            document.querySelectorAll('[data-driver-only] input, [data-driver-only] select, [data-driver-only] textarea').forEach(el => {
+                el.disabled = !isDriver;
+            });
+            document.querySelectorAll('[data-user-only] input, [data-user-only] select, [data-user-only] textarea').forEach(el => {
+                el.disabled = isStore || isDriver;
+            });
 
             // Adjust Right Panel
             if (isDriver) {
@@ -1573,18 +1718,10 @@ if ($cat_res) {
         /* ── Address Autofill Helper (Nominatim) for User & Store ── */
         function setupAddressAutofill(inputEl, sugBoxEl, spinnerEl, latInp, lngInp) {
             if (!inputEl || !sugBoxEl) return;
-            document.body.appendChild(sugBoxEl);
 
             let debounceTimer  = null;
             let activeIndex    = -1;
             let currentResults = [];
-
-            function positionDropdown() {
-                const rect = inputEl.getBoundingClientRect();
-                sugBoxEl.style.top   = (rect.bottom + 4) + "px";
-                sugBoxEl.style.left  = rect.left + "px";
-                sugBoxEl.style.width = rect.width + "px";
-            }
 
             function showSpinner(show) {
                 spinnerEl && spinnerEl.classList.toggle("visible", show);
@@ -1604,7 +1741,7 @@ if ($cat_res) {
                 if (!results.length) {
                     const empty = document.createElement("div");
                     empty.className = "address-suggestion-item";
-                    empty.innerHTML = `<span class="sug-icon">⚠</span><span class="sug-text"><strong>No results found</strong><span>Try a more specific address</span></span>`;
+                    empty.innerHTML = `<span class="sug-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span><span class="sug-text"><strong>No results found</strong><span>Try a more specific address</span></span>`;
                     sugBoxEl.appendChild(empty);
                 } else {
                     results.forEach((r, i) => {
@@ -1615,7 +1752,7 @@ if ($cat_res) {
                         item.className  = "address-suggestion-item";
                         item.setAttribute("role", "option");
                         item.setAttribute("data-index", i);
-                        item.innerHTML  = `<span class="sug-icon">📍</span><span class="sug-text"><strong>${primary}</strong><span>${secondary}</span></span>`;
+                        item.innerHTML  = `<span class="sug-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg></span><span class="sug-text"><strong>${primary}</strong><span>${secondary}</span></span>`;
                         item.addEventListener("mousedown", (e) => {
                             e.preventDefault();
                             selectResult(i);
@@ -1623,7 +1760,6 @@ if ($cat_res) {
                         sugBoxEl.appendChild(item);
                     });
                 }
-                positionDropdown();
                 sugBoxEl.classList.add("open");
             }
 
@@ -1700,10 +1836,6 @@ if ($cat_res) {
             inputEl.addEventListener("blur", () => {
                 setTimeout(closeSuggestions, 180);
             });
-
-            window.addEventListener("resize", () => {
-                if (sugBoxEl.classList.contains("open")) positionDropdown();
-            });
         }
 
         setupAddressAutofill(
@@ -1721,6 +1853,194 @@ if ($cat_res) {
             document.getElementById("store_lat"),
             document.getElementById("store_lng")
         );
+
+        /* ── Store Hours Searchable Dropdown ── */
+        const STORE_HOURS_OPTIONS = [
+            { label: "7am - 8pm", tag: "Daily" },
+            { label: "5am - 6pm", tag: "Daily" },
+            { label: "6am - 9pm", tag: "Daily" },
+            { label: "8am - 5pm", tag: "Daily" },
+            { label: "8am - 8pm", tag: "Daily" },
+            { label: "8am - 9pm", tag: "Daily" },
+            { label: "8am - 10pm", tag: "Daily" },
+            { label: "9am - 6pm", tag: "Daily" },
+            { label: "9am - 9pm", tag: "Daily" },
+            { label: "10am - 10pm", tag: "Daily" },
+            { label: "Mon - Sun, 5am - 6pm", tag: "Early Open" },
+            { label: "Mon - Sun, 7am - 8pm", tag: "Popular" },
+            { label: "Mon - Sun, 6am - 9pm", tag: "Bakery / Cafe" },
+            { label: "Mon - Sun, 7am - 9pm", tag: "Standard" },
+            { label: "Mon - Sun, 7am - 10pm", tag: "Extended" },
+            { label: "Mon - Sun, 8am - 8pm", tag: "Day Shift" },
+            { label: "Mon - Sun, 8am - 9pm", tag: "Standard" },
+            { label: "Mon - Sun, 8am - 10pm", tag: "Evening" },
+            { label: "Mon - Sun, 9am - 9pm", tag: "Mall Hours" },
+            { label: "Mon - Sun, 10am - 10pm", tag: "Late Open" },
+            { label: "Mon - Sat, 7am - 8pm", tag: "Mon - Sat" },
+            { label: "Mon - Sat, 8am - 8pm", tag: "Mon - Sat" },
+            { label: "Mon - Sat, 8am - 9pm", tag: "Mon - Sat" },
+            { label: "Mon - Sat, 9am - 7pm", tag: "Mon - Sat" },
+            { label: "Mon - Fri, 8am - 5pm", tag: "Office Hours" },
+            { label: "Mon - Fri, 9am - 6pm", tag: "Weekdays" },
+            { label: "Open 24 Hours (24/7)", tag: "24/7" }
+        ];
+
+        function setupStoreHoursDropdown() {
+            const input = document.getElementById("store_hours");
+            const wrap = document.getElementById("hours-dropdown-wrap");
+            const menu = document.getElementById("hours-dropdown-menu");
+            const toggleBtn = document.getElementById("hours-toggle-btn");
+            if (!input || !wrap || !menu) return;
+
+            let activeIdx = -1;
+
+            function renderHours(query) {
+                menu.innerHTML = "";
+                activeIdx = -1;
+                const q = (query || "").trim().toLowerCase();
+                const filtered = q === "" 
+                    ? STORE_HOURS_OPTIONS 
+                    : STORE_HOURS_OPTIONS.filter(o => o.label.toLowerCase().includes(q) || o.tag.toLowerCase().includes(q));
+
+                if (filtered.length === 0) {
+                    const noMatch = document.createElement("div");
+                    noMatch.className = "hours-item";
+                    noMatch.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg><span>Use custom: <strong>${input.value}</strong></span>`;
+                    noMatch.addEventListener("mousedown", (e) => {
+                        e.preventDefault();
+                        closeMenu();
+                    });
+                    menu.appendChild(noMatch);
+                } else {
+                    filtered.forEach((item, idx) => {
+                        const el = document.createElement("div");
+                        el.className = "hours-item" + (input.value === item.label ? " selected" : "");
+                        el.setAttribute("role", "option");
+                        el.setAttribute("data-idx", idx);
+                        el.innerHTML = `
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/>
+                            </svg>
+                            <span>${item.label}</span>
+                            <span class="hours-item-badge">${item.tag}</span>
+                        `;
+                        el.addEventListener("mousedown", (e) => {
+                            e.preventDefault();
+                            input.value = item.label;
+                            closeMenu();
+                        });
+                        menu.appendChild(el);
+                    });
+                }
+            }
+
+            function openMenu() {
+                renderHours(input.value);
+                menu.classList.add("open");
+                wrap.classList.add("open");
+            }
+
+            function closeMenu() {
+                menu.classList.remove("open");
+                wrap.classList.remove("open");
+                activeIdx = -1;
+            }
+
+            input.addEventListener("focus", openMenu);
+            input.addEventListener("input", () => {
+                renderHours(input.value);
+                menu.classList.add("open");
+                wrap.classList.add("open");
+            });
+
+            if (toggleBtn) {
+                toggleBtn.addEventListener("click", (e) => {
+                    e.preventDefault();
+                    if (menu.classList.contains("open")) {
+                        closeMenu();
+                    } else {
+                        input.focus();
+                        openMenu();
+                    }
+                });
+            }
+
+            input.addEventListener("keydown", (e) => {
+                const items = menu.querySelectorAll(".hours-item");
+                if (!menu.classList.contains("open") || !items.length) {
+                    if (e.key === "ArrowDown") {
+                        openMenu();
+                        e.preventDefault();
+                    }
+                    return;
+                }
+                if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    activeIdx = (activeIdx + 1) % items.length;
+                    items.forEach((it, i) => it.classList.toggle("active", i === activeIdx));
+                    items[activeIdx]?.scrollIntoView({ block: "nearest" });
+                } else if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    activeIdx = (activeIdx - 1 + items.length) % items.length;
+                    items.forEach((it, i) => it.classList.toggle("active", i === activeIdx));
+                    items[activeIdx]?.scrollIntoView({ block: "nearest" });
+                } else if (e.key === "Enter" && activeIdx >= 0) {
+                    e.preventDefault();
+                    items[activeIdx].dispatchEvent(new MouseEvent("mousedown"));
+                } else if (e.key === "Escape") {
+                    closeMenu();
+                }
+            });
+
+            input.addEventListener("blur", () => {
+                setTimeout(closeMenu, 200);
+            });
+        }
+
+        setupStoreHoursDropdown();
+
+        // Pre-submit validation: warn if coordinates are missing or contact is invalid
+        const regForm = document.getElementById("registration-form");
+        if (regForm) {
+            regForm.addEventListener("submit", function(e) {
+                const contactVal = document.getElementById("contact")?.value.trim() || "";
+                if (contactVal && !/^[0-9]+$/.test(contactVal)) {
+                    e.preventDefault();
+                    alert("Phone number must contain numbers only.");
+                    document.getElementById("contact")?.focus();
+                    return false;
+                }
+                if (contactVal && (contactVal.length < 10 || contactVal.length > 11)) {
+                    e.preventDefault();
+                    alert("Phone number must be 10 or 11 digits (e.g. 09123456789).");
+                    document.getElementById("contact")?.focus();
+                    return false;
+                }
+
+                const selected = document.querySelector('input[name="account_type"]:checked')?.value || "user";
+                if (selected === "user") {
+                    const uLat = document.getElementById("user_lat")?.value;
+                    const uLng = document.getElementById("user_lng")?.value;
+                    if (!uLat || !uLng) {
+                        e.preventDefault();
+                        alert("Please pin your delivery location on the map, select an address suggestion, or click 'GPS'.");
+                        const sideMap = document.getElementById("side-map-container");
+                        if (sideMap) sideMap.scrollIntoView({ behavior: "smooth" });
+                        return false;
+                    }
+                } else if (selected === "store") {
+                    const sLat = document.getElementById("store_lat")?.value;
+                    const sLng = document.getElementById("store_lng")?.value;
+                    if (!sLat || !sLng) {
+                        e.preventDefault();
+                        alert("Please pin your store location on the map, select an address suggestion, or click 'GPS'.");
+                        const sideMap = document.getElementById("side-map-container");
+                        if (sideMap) sideMap.scrollIntoView({ behavior: "smooth" });
+                        return false;
+                    }
+                }
+            });
+        }
     </script>
 </body>
 </html>

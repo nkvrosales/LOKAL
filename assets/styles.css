@@ -713,8 +713,10 @@ a:hover {
   }
   
   .login-brand img {
-    width: 32px;
-    height: 32px;
+    width: min(200px, 72vw);
+    height: auto;
+    max-height: 120px;
+    object-fit: contain;
   }
   
   h1, h2, h3 {
