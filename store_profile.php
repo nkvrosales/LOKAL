@@ -121,7 +121,7 @@ $store = null;
 $products = [];
 
 $stmt = $mysqli->prepare(
-    "SELECT id, store_name, first_name, last_name, store_address, store_lat, store_lng, store_contact, contact, email, store_hours, store_category, profile_image
+    "SELECT id, store_name, first_name, last_name, store_address, store_lat, store_lng, store_contact, contact, email, store_hours, store_is_open, store_category, profile_image
      FROM users
      WHERE id = ?
        AND account_type = 'store'
@@ -142,6 +142,7 @@ if ($stmt) {
         $defaultContact,
         $email,
         $storeHours,
+        $storeIsOpen,
         $storeCategory,
         $profileImage
     );
@@ -165,6 +166,7 @@ if ($stmt) {
             "contact" => $displayContact,
             "email" => (string) ($email ?? ""),
             "hours" => trim((string) ($storeHours ?? "")),
+            "is_open" => (int) ($storeIsOpen ?? 1) === 1,
             "category" => (string) ($storeCategory ?? "Store"),
             "profile_image" => (string) ($profileImage ?? ""),
         ];
@@ -178,15 +180,15 @@ if (!$store) {
 }
 
 $productStmt = $mysqli->prepare(
-    "SELECT id, product_name, product_description, product_price, product_image
+    "SELECT id, product_name, product_description, product_price, product_image, is_active
      FROM store_products
-     WHERE store_user_id = ? AND is_active = 1
+     WHERE store_user_id = ?
      ORDER BY id DESC"
 );
 if ($productStmt) {
     $productStmt->bind_param("i", $storeId);
     $productStmt->execute();
-    $productStmt->bind_result($productId, $productName, $productDescription, $productPrice, $productImage);
+    $productStmt->bind_result($productId, $productName, $productDescription, $productPrice, $productImage, $productIsActive);
     while ($productStmt->fetch()) {
         $products[] = [
             "id"          => (int) $productId,
@@ -195,6 +197,7 @@ if ($productStmt) {
             "price"       => $productPrice !== null ? (float) $productPrice : null,
             "price_label" => $format_price_label($productPrice),
             "image"       => $productImage ? trim((string) $productImage) : null,
+            "is_active"   => (int) $productIsActive === 1,
         ];
     }
     $productStmt->close();
@@ -247,6 +250,34 @@ $storeForCart["products"] = $products;
     <title><?php echo escape($store["name"]); ?> | Lokal</title>
     <link rel="stylesheet" href="assets/styles.css?v=primary-bw-icons-1">
     <link rel="stylesheet" href="assets/store-admin.css?v=responsive-tabs-v5">
+    <style>
+        .public-product-item[data-product-id] { cursor: pointer; }
+        .public-product-item[data-product-id]:focus { outline: 3px solid rgba(255, 91, 46, .35); outline-offset: 3px; }
+        .public-add-btn:disabled, .public-cart-checkout:disabled { cursor: not-allowed; opacity: .55; filter: grayscale(.2); }
+        .product-view-content { display: grid; grid-template-columns: minmax(0, 190px) 1fr; gap: 22px; align-items: start; }
+        .product-view-image, .product-view-image-placeholder { width: 100%; aspect-ratio: 1; border-radius: 14px; object-fit: cover; background: #f1f5f9; }
+        .product-view-image-placeholder { display: flex; align-items: center; justify-content: center; color: #94a3b8; }
+        .product-view-image-placeholder svg { width: 54px; height: 54px; }
+        .product-view-description { white-space: pre-wrap; color: #475569; line-height: 1.6; margin: 12px 0 20px; }
+        .product-view-price { color: #ff5b2e; font-size: 20px; font-weight: 800; margin: 7px 0 0; }
+        @media (max-width: 620px) {
+            #product-view-modal { place-items: end stretch; padding: 0; }
+            #product-view-modal .public-cart-panel {
+                width: 100% !important;
+                max-height: min(86dvh, 720px);
+                grid-template-rows: auto minmax(0, 1fr);
+                gap: 12px;
+                overflow: hidden;
+                padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+                border-width: 1px 0 0;
+                border-radius: 22px 22px 0 0;
+            }
+            .product-view-content { grid-template-columns: 1fr; gap: 14px; overflow-y: auto; overscroll-behavior: contain; padding: 0 2px 4px; }
+            .product-view-image, .product-view-image-placeholder { max-height: 180px; }
+            .product-view-description { margin: 8px 0 14px; line-height: 1.5; }
+            #product-view-add { position: sticky; bottom: 0; padding: 13px; }
+        }
+    </style>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 </head>
 <body class="store-admin-body">
@@ -331,8 +362,8 @@ $storeForCart["products"] = $products;
                     </h1>
                     <div class="store-hero-badges">
                         <span class="store-badge-cat"><?php echo escape($store["category"]); ?></span>
-                        <span class="store-badge-open" style="background:<?php echo store_hours_status($store["hours"]) === "Open now" ? '#DCFCE7;color:#166534;' : '#FEE2E2;color:#991B1B;'; ?>; border:1px solid <?php echo store_hours_status($store["hours"]) === "Open now" ? '#86EFAC' : '#FCA5A5'; ?>;">
-                            <?php echo store_hours_status($store["hours"]) === "Open now" ? "Open now" : "Closed now"; ?>
+                        <span class="store-badge-open <?php echo $store["is_open"] ? "open" : "closed"; ?>" style="background:<?php echo $store["is_open"] ? '#DCFCE7;color:#166534;' : '#FEE2E2;color:#991B1B;'; ?>; border:1px solid <?php echo $store["is_open"] ? '#86EFAC' : '#FCA5A5'; ?>;">
+                            <?php echo $store["is_open"] ? "Open now" : "Closed now"; ?>
                         </span>
                     </div>
                     <p class="store-hero-address">
@@ -381,7 +412,7 @@ $storeForCart["products"] = $products;
             <div class="public-store-section-head">
                 <div>
                     <h2>Products</h2>
-                    <p id="cart-status">Choose delivery or pickup, select your preferred time, and add items to cart.</p>
+                    <p id="cart-status"><?php echo $store["is_open"] ? "Choose delivery or pickup, select your preferred time, and add items to cart." : "This store is currently closed and is not accepting orders."; ?></p>
                 </div>
                 <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
                     <div class="store-search-bar">
@@ -398,7 +429,7 @@ $storeForCart["products"] = $products;
             <?php if ($products): ?>
                 <div class="public-product-list" id="public-product-list">
                     <?php foreach ($products as $product): ?>
-                        <article class="public-product-item" data-product-name="<?php echo strtolower(escape($product["name"])); ?>">
+                        <article class="public-product-item" data-product-id="<?php echo (int) $product["id"]; ?>" data-product-name="<?php echo strtolower(escape($product["name"])); ?>" tabindex="0" aria-label="View <?php echo escape($product["name"] !== "" ? $product["name"] : "product"); ?>">
                             <div class="public-product-img-wrap">
                                 <?php if (!empty($product["image"]) && file_exists(__DIR__ . "/uploads/products/" . $product["image"])): ?>
                                     <img class="public-product-img" src="uploads/products/<?php echo escape($product["image"]); ?>" alt="<?php echo escape($product["name"]); ?>" loading="lazy">
@@ -415,6 +446,9 @@ $storeForCart["products"] = $products;
                             <div class="public-product-body">
                                 <h3><?php echo escape($product["name"] !== "" ? $product["name"] : "Product"); ?></h3>
                                 <p class="public-product-price"><?php echo escape($product["price_label"] !== "" ? $product["price_label"] : "Price not set"); ?></p>
+                                <?php if (!$product["is_active"]): ?>
+                                    <p style="margin:5px 0 0;color:#B91C1C;font-size:12px;font-weight:700;">Not available</p>
+                                <?php endif; ?>
                                 <?php if ($product["description"] !== ""): ?>
                                     <p class="public-product-desc"><?php echo escape($product["description"]); ?></p>
                                 <?php endif; ?>
@@ -428,7 +462,7 @@ $storeForCart["products"] = $products;
                                         <button type="button" class="public-qty-btn plus" data-qty-action="increase">+</button>
                                     </div>
                                 </div>
-                                <button type="button" class="public-add-btn" data-product-id="<?php echo (int) $product["id"]; ?>">
+                                <button type="button" class="public-add-btn" data-product-id="<?php echo (int) $product["id"]; ?>" <?php echo (!$store["is_open"] || !$product["is_active"]) ? "disabled aria-disabled=\"true\"" : ""; ?>>
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                                     Add to cart
                                 </button>
@@ -444,6 +478,27 @@ $storeForCart["products"] = $products;
             <?php endif; ?>
         </section>
     </main>
+
+    <section class="public-cart-modal" id="product-view-modal" aria-label="Product details" hidden>
+        <div class="public-cart-backdrop" data-product-view-close></div>
+        <div class="public-cart-panel" role="dialog" aria-modal="true" aria-labelledby="product-view-title" style="width:min(620px, 100%);">
+            <div class="public-cart-head">
+                <div>
+                    <h2 id="product-view-title">Product</h2>
+                    <p id="product-view-store"></p>
+                </div>
+                <button type="button" class="public-cart-close" data-product-view-close aria-label="Close product details">&times;</button>
+            </div>
+            <div class="product-view-content">
+                <div id="product-view-image"></div>
+                <div>
+                    <p class="product-view-price" id="product-view-price"></p>
+                    <p class="product-view-description" id="product-view-description"></p>
+                    <button type="button" class="btn public-cart-checkout" id="product-view-add" style="width:100%;">Add to cart</button>
+                </div>
+            </div>
+        </div>
+    </section>
 
     <!-- â”€â”€ ENHANCED CART MODAL WITH DELIVERY/PICKUP & TIME SELECTION â”€â”€ -->
     <section class="public-cart-modal" id="public-cart-modal" aria-label="Cart" hidden>
@@ -517,6 +572,13 @@ $storeForCart["products"] = $products;
         const publicCartCount = document.getElementById("public-cart-count");
         const publicCartOpen = document.getElementById("public-cart-open");
         const publicCartModal = document.getElementById("public-cart-modal");
+        const productViewModal = document.getElementById("product-view-modal");
+        const productViewTitle = document.getElementById("product-view-title");
+        const productViewStore = document.getElementById("product-view-store");
+        const productViewImage = document.getElementById("product-view-image");
+        const productViewPrice = document.getElementById("product-view-price");
+        const productViewDescription = document.getElementById("product-view-description");
+        const productViewAdd = document.getElementById("product-view-add");
         const publicCartItems = document.getElementById("public-cart-items");
         const publicCartSummary = document.getElementById("public-cart-summary");
         const publicCartTotal = document.getElementById("public-cart-total");
@@ -650,7 +712,7 @@ $storeForCart["products"] = $products;
             }
 
             if (cartCheckoutBtn) {
-                cartCheckoutBtn.disabled = itemCount === 0;
+                cartCheckoutBtn.disabled = itemCount === 0 || !store.is_open;
             }
 
             if (!publicCartItems) {
@@ -773,6 +835,10 @@ $storeForCart["products"] = $products;
         // Checkout Button Click Handler
         if (cartCheckoutBtn) {
             cartCheckoutBtn.addEventListener("click", () => {
+                if (!store.is_open) {
+                    setStatus("This store is currently closed and is not accepting orders.");
+                    return;
+                }
                 const selectedTime = cartTimeSelect ? cartTimeSelect.value : "ASAP";
                 const checkoutUrl = `store_checkout.php?store_id=${encodeURIComponent(store.id)}&order_type=${encodeURIComponent(currentServiceType)}&scheduled_time=${encodeURIComponent(selectedTime)}`;
                 window.location.href = checkoutUrl;
@@ -790,6 +856,39 @@ $storeForCart["products"] = $products;
             }
         }
 
+        function setProductViewOpen(productId) {
+            const product = Array.isArray(store.products)
+                ? store.products.find((item) => String(item.id) === String(productId))
+                : null;
+            if (!product || !productViewModal) return;
+
+            productViewTitle.textContent = product.name || "Product";
+            productViewStore.textContent = store.name || "Store";
+            productViewPrice.textContent = product.price_label || "Price not set";
+            productViewDescription.textContent = product.description || "No description provided for this product.";
+            productViewAdd.dataset.productId = product.id;
+            productViewAdd.disabled = !store.is_open || !product.is_active;
+            productViewAdd.textContent = !product.is_active ? "Not available" : (store.is_open ? "Add to cart" : "Store is closed");
+            productViewImage.replaceChildren();
+            if (product.image) {
+                const image = document.createElement("img");
+                image.className = "product-view-image";
+                image.src = `uploads/products/${encodeURIComponent(product.image)}`;
+                image.alt = product.name || "Product";
+                productViewImage.appendChild(image);
+            } else {
+                productViewImage.innerHTML = '<div class="product-view-image-placeholder" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>';
+            }
+            productViewModal.hidden = false;
+            document.body.style.overflow = "hidden";
+        }
+
+        function closeProductView() {
+            if (!productViewModal) return;
+            productViewModal.hidden = true;
+            document.body.style.overflow = "";
+        }
+
         function getRequestedQuantity(button) {
             const item = button ? button.closest(".public-product-item") : null;
             const input = item ? item.querySelector("[data-product-quantity]") : null;
@@ -801,10 +900,18 @@ $storeForCart["products"] = $products;
         }
 
         function addProduct(productId, quantity = 1) {
+            if (!store.is_open) {
+                setStatus("This store is currently closed and is not accepting orders.");
+                return;
+            }
             const product = Array.isArray(store.products)
                 ? store.products.find((item) => String(item.id) === String(productId))
                 : null;
             if (!product) {
+                return;
+            }
+            if (!product.is_active) {
+                setStatus("This product is not available.");
                 return;
             }
 
@@ -849,7 +956,7 @@ $storeForCart["products"] = $products;
             setStatus(items.length ? "Cart updated." : "Cart cleared.");
         }
 
-        document.querySelectorAll("[data-product-id]").forEach((button) => {
+        document.querySelectorAll(".public-add-btn[data-product-id]").forEach((button) => {
             button.addEventListener("click", () => {
                 addProduct(
                     button.dataset.productId || "",
@@ -857,6 +964,30 @@ $storeForCart["products"] = $products;
                 );
             });
         });
+
+        document.querySelectorAll(".public-product-item[data-product-id]").forEach((item) => {
+            item.addEventListener("click", (event) => {
+                if (event.target.closest("button, input")) return;
+                setProductViewOpen(item.dataset.productId);
+            });
+            item.addEventListener("keydown", (event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setProductViewOpen(item.dataset.productId);
+                }
+            });
+        });
+
+        document.querySelectorAll("[data-product-view-close]").forEach((button) => {
+            button.addEventListener("click", closeProductView);
+        });
+
+        if (productViewAdd) {
+            productViewAdd.addEventListener("click", () => {
+                addProduct(productViewAdd.dataset.productId || "", 1);
+                closeProductView();
+            });
+        }
 
         // Handle quantity +/- buttons
         document.querySelectorAll(".public-qty-btn").forEach((btn) => {
@@ -926,6 +1057,7 @@ $storeForCart["products"] = $products;
         document.addEventListener("keydown", (event) => {
             if (event.key === "Escape") {
                 setCartModalOpen(false);
+                closeProductView();
             }
         });
 

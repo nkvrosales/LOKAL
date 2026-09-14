@@ -60,6 +60,7 @@ if ($is_store && $user_id > 0) {
 if (!$is_store) {
     $store_ids = [];
     $products_by_store = [];
+    $has_registered_stores = false;
 
     $user_pin_stmt = $mysqli->prepare(
         "SELECT user_address, user_lat, user_lng
@@ -80,7 +81,7 @@ if (!$is_store) {
     }
 
     $stmt = $mysqli->prepare(
-        "SELECT id, store_name, first_name, last_name, store_address, store_lat, store_lng, store_contact, contact, store_category
+        "SELECT id, store_name, first_name, last_name, store_address, store_lat, store_lng, store_contact, contact, store_category, store_is_open
          FROM users
          WHERE account_type = 'store'
            AND store_lat IS NOT NULL
@@ -98,9 +99,14 @@ if (!$is_store) {
             $store_lng,
             $store_contact,
             $default_contact,
-            $store_category
+            $store_category,
+            $store_is_open
         );
         while ($stmt->fetch()) {
+            $has_registered_stores = true;
+            if ((int) ($store_is_open ?? 0) !== 1) {
+                continue;
+            }
             $fallback_name = trim(($first_name ?? "") . " " . ($last_name ?? ""));
             $display_name = trim((string) ($store_name ?? ""));
             $display_contact = trim((string) ($store_contact ?? ""));
@@ -161,7 +167,7 @@ if (!$is_store) {
         unset($store);
     }
 
-    if (empty($stores)) {
+    if (empty($stores) && !$has_registered_stores) {
         $stores = [
             [
                 "id" => "sample_1",
@@ -1397,6 +1403,22 @@ if (empty($sidebar_categories)) {
             // Sidebar logic matching reference images
             let activeCategory = "all";
 
+            function updateMapStoreMarkers() {
+                const visibleStores = stores.filter((store) => activeCategory === "all"
+                    || String(store.category || "").toLowerCase() === activeCategory.toLowerCase());
+                markerByStoreId.forEach((marker, storeId) => {
+                    const store = storeById.get(String(storeId));
+                    const visible = !!store && (activeCategory === "all"
+                        || String(store.category || "").toLowerCase() === activeCategory.toLowerCase());
+                    if (visible) {
+                        marker.addTo(map);
+                    } else {
+                        map.removeLayer(marker);
+                    }
+                });
+                setStatus(visibleStores.length === 1 ? "1 store available." : `${visibleStores.length} stores available.`);
+            }
+
             function renderSidebarStores() {
                 const listEl = document.getElementById("sidebar-store-list");
                 if (!listEl) return;
@@ -1416,11 +1438,7 @@ if (empty($sidebar_categories)) {
 
                     let matchesCategory = true;
                     if (activeCategory !== "all") {
-                        const catTarget = activeCategory.toLowerCase();
-                        matchesCategory = category.includes(catTarget)
-                            || name.includes(catTarget)
-                            || productsStr.includes(catTarget)
-                            || address.includes(catTarget);
+                        matchesCategory = category === activeCategory.toLowerCase();
                     }
 
                     return matchesSearch && matchesCategory;
@@ -1456,6 +1474,7 @@ if (empty($sidebar_categories)) {
                     pill.classList.add("active");
                     activeCategory = pill.dataset.cat || "all";
                     renderSidebarStores();
+                    updateMapStoreMarkers();
                 });
             }
 

@@ -26,6 +26,7 @@ $values = [
     "store_category" => "",
     "vehicle_registration" => "",
     "orcr_image" => "",
+    "business_permit_image" => "",
 ];
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
@@ -97,6 +98,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         }
     }
     if ($values["account_type"] === "store") {
+        if ($values["store_category"] === "") {
+            $errors[] = "Store category is required.";
+        }
         if ($values["store_name"] === "") {
             $errors[] = "Store name is required.";
         }
@@ -110,6 +114,16 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $errors[] = "Pin your store location on the map.";
         } elseif (!is_numeric($values["store_lat"]) || !is_numeric($values["store_lng"])) {
             $errors[] = "Store location coordinates are invalid.";
+        }
+        if (!isset($_FILES["store_owner_id_image"]) || !is_uploaded_file($_FILES["store_owner_id_image"]["tmp_name"])) {
+            $errors[] = "Valid ID image is required for store owner registration.";
+        } elseif (!in_array(strtolower(pathinfo($_FILES["store_owner_id_image"]["name"], PATHINFO_EXTENSION)), ["jpg", "jpeg", "png", "webp"], true)) {
+            $errors[] = "Store owner ID image must be JPG, PNG, or WEBP.";
+        }
+        if (!isset($_FILES["business_permit_image"]) || !is_uploaded_file($_FILES["business_permit_image"]["tmp_name"])) {
+            $errors[] = "Business permit is required for store registration.";
+        } elseif (!in_array(strtolower(pathinfo($_FILES["business_permit_image"]["name"], PATHINFO_EXTENSION)), ["jpg", "jpeg", "png", "webp"], true)) {
+            $errors[] = "Business permit must be JPG, PNG, or WEBP.";
         }
     }
     $profile_image_file = null;
@@ -176,8 +190,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     if (!$errors) {
         $hash = password_hash($password, PASSWORD_DEFAULT);
         $stmt = $mysqli->prepare(
-            "INSERT INTO users (account_type, store_name, first_name, middle_name, last_name, contact, email, password_hash, user_address, user_lat, user_lng, store_address, store_lat, store_lng, store_hours, store_category, vehicle_registration, orcr_image, id_image, profile_image)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO users (account_type, store_name, first_name, middle_name, last_name, contact, email, password_hash, user_address, user_lat, user_lng, store_address, store_lat, store_lng, store_hours, store_category, vehicle_registration, orcr_image, id_image, business_permit_image, profile_image)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         );
         if ($stmt) {
             $store_name      = $values["account_type"] === "store" ? $values["store_name"] : null;
@@ -191,6 +205,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $store_category  = $values["account_type"] === "store" && $values["store_category"] !== ""
                 ? $values["store_category"] : null;
             $id_image_filename = null;
+            $business_permit_filename = null;
             $orcr_image_filename = null;
             $profile_image_filename = null;
 
@@ -237,12 +252,31 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         move_uploaded_file($_FILES["orcr_image"]["tmp_name"], $dest2);
                     }
                 }
+            } elseif ($values["account_type"] === "store") {
+                if (isset($_FILES["store_owner_id_image"]) && is_uploaded_file($_FILES["store_owner_id_image"]["tmp_name"])) {
+                    $ext = strtolower(pathinfo($_FILES["store_owner_id_image"]["name"], PATHINFO_EXTENSION));
+                    if (in_array($ext, $allowed_ext, true)) {
+                        $uploads_dir = __DIR__ . DIRECTORY_SEPARATOR . "uploads" . DIRECTORY_SEPARATOR . "ids";
+                        if (!is_dir($uploads_dir)) mkdir($uploads_dir, 0755, true);
+                        $id_image_filename = bin2hex(random_bytes(8)) . "_" . time() . "." . $ext;
+                        move_uploaded_file($_FILES["store_owner_id_image"]["tmp_name"], $uploads_dir . DIRECTORY_SEPARATOR . $id_image_filename);
+                    }
+                }
+                if (isset($_FILES["business_permit_image"]) && is_uploaded_file($_FILES["business_permit_image"]["tmp_name"])) {
+                    $ext = strtolower(pathinfo($_FILES["business_permit_image"]["name"], PATHINFO_EXTENSION));
+                    if (in_array($ext, $allowed_ext, true)) {
+                        $uploads_dir = __DIR__ . DIRECTORY_SEPARATOR . "uploads" . DIRECTORY_SEPARATOR . "business_permits";
+                        if (!is_dir($uploads_dir)) mkdir($uploads_dir, 0755, true);
+                        $business_permit_filename = bin2hex(random_bytes(8)) . "_" . time() . "." . $ext;
+                        move_uploaded_file($_FILES["business_permit_image"]["tmp_name"], $uploads_dir . DIRECTORY_SEPARATOR . $business_permit_filename);
+                    }
+                }
             }
 
             $vehicle_registration = $values["account_type"] === "driver" ? $values["vehicle_registration"] : null;
 
             $stmt->bind_param(
-                str_repeat("s", 20),
+                str_repeat("s", 21),
                 $values["account_type"],
                 $store_name,
                 $values["first_name"],
@@ -262,6 +296,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 $vehicle_registration,
                 $orcr_image_filename,
                 $id_image_filename,
+                $business_permit_filename,
                 $profile_image_filename
             );
             try {
@@ -489,7 +524,11 @@ if ($cat_res) {
             margin: 0;
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            justify-content: flex-start;
+            gap: 4px;
+        }
+        .reg-field label .inline-loc-btn {
+            margin-left: auto;
         }
 
         .reg-field input, 
@@ -1160,15 +1199,15 @@ if ($cat_res) {
                         <!-- Row 1: Full Name (3 Cols) -->
                         <div class="reg-grid-row reg-grid-3">
                             <div class="reg-field">
-                                <label for="first_name">First Name</label>
+                                <label for="first_name">First Name <span style="color:#EF4444;">*</span></label>
                                 <input type="text" id="first_name" name="first_name" value="<?php echo escape($values["first_name"]); ?>" placeholder="Juan" required>
                             </div>
                             <div class="reg-field">
-                                <label for="middle_name">Middle Name</label>
+                                <label for="middle_name">Middle Name <span style="color:#EF4444;">*</span></label>
                                 <input type="text" id="middle_name" name="middle_name" value="<?php echo escape($values["middle_name"]); ?>" placeholder="Santos" required>
                             </div>
                             <div class="reg-field">
-                                <label for="last_name">Last Name</label>
+                                <label for="last_name">Last Name <span style="color:#EF4444;">*</span></label>
                                 <input type="text" id="last_name" name="last_name" value="<?php echo escape($values["last_name"]); ?>" placeholder="Dela Cruz" required>
                             </div>
                         </div>
@@ -1176,11 +1215,11 @@ if ($cat_res) {
                         <!-- Row 2: Contact & Email (2 Cols) -->
                         <div class="reg-grid-row reg-grid-2">
                             <div class="reg-field">
-                                <label for="contact">Phone Number</label>
+                                <label for="contact">Phone Number <span style="color:#EF4444;">*</span></label>
                                 <input type="text" id="contact" name="contact" value="<?php echo escape($values["contact"]); ?>" placeholder="09123456789" maxlength="20" required>
                             </div>
                             <div class="reg-field">
-                                <label for="email">Email Address</label>
+                                <label for="email">Email Address <span style="color:#EF4444;">*</span></label>
                                 <input type="email" id="email" name="email" value="<?php echo escape($values["email"]); ?>" placeholder="juan@example.com" required>
                             </div>
                         </div>
@@ -1189,7 +1228,7 @@ if ($cat_res) {
                         <div class="user-only" data-user-only>
                             <div class="reg-field">
                                 <label for="user_address">
-                                    <span>Delivery Address</span>
+                                    <span>Delivery Address <span style="color:#EF4444;">*</span></span>
                                     <button type="button" class="inline-loc-btn" id="use-current-location-field-btn">
                                         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
                                         <span>GPS</span>
@@ -1213,12 +1252,12 @@ if ($cat_res) {
                         <div class="store-only" data-store-only hidden>
                             <div class="reg-grid-row reg-grid-2" style="margin-bottom: 8px;">
                                 <div class="reg-field">
-                                    <label for="store_name">Store Name</label>
+                                    <label for="store_name">Store Name <span style="color:#EF4444;">*</span></label>
                                     <input type="text" id="store_name" name="store_name" value="<?php echo escape($values["store_name"]); ?>" placeholder="e.g. Bella Bakery">
                                 </div>
                                 <div class="reg-field">
-                                    <label for="store_category">Category</label>
-                                    <select id="store_category" name="store_category">
+                                    <label for="store_category">Category <span style="color:#EF4444;">*</span></label>
+                                    <select id="store_category" name="store_category" required>
                                         <option value="">— Select category —</option>
                                         <?php foreach ($reg_categories as $rc): ?>
                                             <option value="<?php echo escape($rc['slug']); ?>" <?php echo $values['store_category'] === $rc['slug'] ? 'selected' : ''; ?>>
@@ -1230,7 +1269,7 @@ if ($cat_res) {
                             </div>
                             <div class="reg-field">
                                 <label for="store_address">
-                                    <span>Store Address</span>
+                                    <span>Store Address <span style="color:#EF4444;">*</span></span>
                                     <button type="button" class="inline-loc-btn" id="use-current-location-store-btn">
                                         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
                                         <span>GPS</span>
@@ -1245,7 +1284,7 @@ if ($cat_res) {
                                 <input type="hidden" id="store_lng" name="store_lng" value="<?php echo escape($values["store_lng"]); ?>">
                             </div>
                             <div class="reg-field">
-                                <label for="store_hours">Store Hours</label>
+                                <label for="store_hours">Store Hours <span style="color:#EF4444;">*</span></label>
                                 <div class="hours-dropdown-wrap" id="hours-dropdown-wrap">
                                     <input type="text" id="store_hours" name="store_hours" value="<?php echo escape($values["store_hours"]); ?>" placeholder="e.g. 7am - 8pm or Mon - Sun, 5am - 6pm" autocomplete="off">
                                     <button type="button" class="hours-dropdown-arrow" id="hours-toggle-btn" aria-label="Toggle store hours options" tabindex="-1">
@@ -1256,11 +1295,24 @@ if ($cat_res) {
                             </div>
                         </div>
 
+                        <div class="store-only" data-store-only hidden>
+                            <div class="reg-grid-row reg-grid-2">
+                                <div class="reg-field">
+                                    <label for="store_owner_id_image">Store Owner Valid ID <span style="font-weight:700; font-size:11.5px; color:#EF4444;">*Required</span></label>
+                                    <input type="file" id="store_owner_id_image" name="store_owner_id_image" accept="image/*">
+                                </div>
+                                <div class="reg-field">
+                                    <label for="business_permit_image">Business Permit <span style="font-weight:700; font-size:11.5px; color:#EF4444;">*Required</span></label>
+                                    <input type="file" id="business_permit_image" name="business_permit_image" accept="image/*">
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- DRIVER SPECIFIC: Vehicle & Documents -->
                         <div class="driver-only" data-driver-only hidden>
                             <div class="reg-grid-row reg-grid-2" style="margin-bottom: 8px;">
                                 <div class="reg-field">
-                                    <label for="vehicle_registration">Vehicle Type / Plate</label>
+                                    <label for="vehicle_registration">Vehicle Type / Plate <span style="color:#EF4444;">*</span></label>
                                     <input type="text" id="vehicle_registration" name="vehicle_registration" value="<?php echo escape($values['vehicle_registration']); ?>" placeholder="e.g. Motorcycle (ABC-1234)">
                                 </div>
                                 <div class="reg-field">
@@ -1283,7 +1335,7 @@ if ($cat_res) {
                         <!-- Row 3: Passwords (2 Cols) -->
                         <div class="reg-grid-row reg-grid-2">
                             <div class="reg-field">
-                                <label for="password">Password</label>
+                                <label for="password">Password <span style="color:#EF4444;">*</span></label>
                                 <div class="reg-pw-wrap">
                                     <input type="password" id="password" name="password" placeholder="Min. 6 characters" required>
                                     <button type="button" class="reg-pw-btn" onclick="togglePasswordVisibility('password', this)" title="Toggle password">
@@ -1292,7 +1344,7 @@ if ($cat_res) {
                                 </div>
                             </div>
                             <div class="reg-field">
-                                <label for="confirm_password">Confirm Password</label>
+                                <label for="confirm_password">Confirm Password <span style="color:#EF4444;">*</span></label>
                                 <div class="reg-pw-wrap">
                                     <input type="password" id="confirm_password" name="confirm_password" placeholder="Repeat password" required>
                                     <button type="button" class="reg-pw-btn" onclick="togglePasswordVisibility('confirm_password', this)" title="Toggle password">

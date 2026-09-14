@@ -115,6 +115,7 @@ $productStmt = $mysqli->prepare(
      INNER JOIN users u ON u.id = sp.store_user_id
      WHERE sp.id = ?
        AND u.account_type = 'store'
+       AND u.store_is_open = 1
        AND u.store_lat IS NOT NULL
        AND u.store_lng IS NOT NULL
      LIMIT 1"
@@ -166,9 +167,9 @@ foreach ($requested as $productId => $quantity) {
 }
 $productStmt->close();
 
-if (!$productRows) {
+if (count($productRows) !== count($requested)) {
     http_response_code(400);
-    echo json_encode(["ok" => false, "message" => "No valid products found."]);
+    echo json_encode(["ok" => false, "message" => "Some items are unavailable because the store is closed or the product is no longer available."]);
     exit;
 }
 

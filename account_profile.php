@@ -29,9 +29,11 @@ $profile = [
     "store_lat"             => "",
     "store_lng"             => "",
     "store_hours"           => "",
+    "store_is_open"         => 1,
     "store_category"        => "",
     "vehicle_registration"  => "",
     "id_image"              => "",
+    "business_permit_image" => "",
     "orcr_image"            => "",
     "profile_image"         => "",
     "is_approved"           => 0,
@@ -55,9 +57,11 @@ function load_account_profile(mysqli $mysqli, int $userId): array
         "store_lat"             => "",
         "store_lng"             => "",
         "store_hours"           => "",
+        "store_is_open"         => 1,
         "store_category"        => "",
         "vehicle_registration"  => "",
         "id_image"              => "",
+        "business_permit_image" => "",
         "orcr_image"            => "",
         "profile_image"         => "",
         "is_approved"           => 0,
@@ -67,8 +71,8 @@ function load_account_profile(mysqli $mysqli, int $userId): array
     $stmt = $mysqli->prepare(
         "SELECT first_name, middle_name, last_name, contact, email,
                 user_address, user_lat, user_lng,
-                store_name, store_contact, store_address, store_lat, store_lng, store_hours, store_category,
-                vehicle_registration, id_image, orcr_image, profile_image, is_approved, created_at
+                store_name, store_contact, store_address, store_lat, store_lng, store_hours, store_is_open, store_category,
+                vehicle_registration, id_image, business_permit_image, orcr_image, profile_image, is_approved, created_at
          FROM users
          WHERE id = ?
          LIMIT 1"
@@ -94,9 +98,11 @@ function load_account_profile(mysqli $mysqli, int $userId): array
         $storeLat,
         $storeLng,
         $storeHours,
+        $storeIsOpen,
         $storeCategory,
         $vehicleReg,
         $idImage,
+        $businessPermitImage,
         $orcrImage,
         $profileImage,
         $isApproved,
@@ -118,9 +124,11 @@ function load_account_profile(mysqli $mysqli, int $userId): array
             "store_lat"             => $storeLat !== null ? (string) $storeLat : "",
             "store_lng"             => $storeLng !== null ? (string) $storeLng : "",
             "store_hours"           => trim((string) ($storeHours ?? "")),
+            "store_is_open"         => (int) ($storeIsOpen ?? 1) === 1 ? 1 : 0,
             "store_category"        => trim((string) ($storeCategory ?? "")),
             "vehicle_registration"  => trim((string) ($vehicleReg ?? "")),
             "id_image"              => trim((string) ($idImage ?? "")),
+            "business_permit_image" => trim((string) ($businessPermitImage ?? "")),
             "orcr_image"            => trim((string) ($orcrImage ?? "")),
             "profile_image"         => trim((string) ($profileImage ?? "")),
             "is_approved"           => (int) ($isApproved ?? 0),
@@ -135,17 +143,32 @@ function load_account_profile(mysqli $mysqli, int $userId): array
 $profile = load_account_profile($mysqli, $userId);
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
-    // â”€â”€ Handle Account Deletion â”€â”€
-    if (isset($_POST["delete_account_submit"])) {
+    if ($isStore && isset($_POST["store_status_update"])) {
+        $nextStoreStatus = ($_POST["store_is_open"] ?? "0") === "1" ? 1 : 0;
+        $statusStmt = $mysqli->prepare("UPDATE users SET store_is_open = ? WHERE id = ? AND account_type = 'store' LIMIT 1");
+        if ($statusStmt) {
+            $statusStmt->bind_param("ii", $nextStoreStatus, $userId);
+            if ($statusStmt->execute()) {
+                $notice = $nextStoreStatus ? "Store opened." : "Store closed.";
+                $profile["store_is_open"] = $nextStoreStatus;
+            } else {
+                $errors[] = "Unable to update store status.";
+            }
+            $statusStmt->close();
+        } else {
+            $errors[] = "Unable to update store status.";
+        }
+    // ── Handle Account Deletion ─────────────────────────────────────────────
+    } elseif (isset($_POST["delete_account_submit"])) {
         $delPassword = $_POST["delete_confirm_password"] ?? "";
         if ($delPassword === "") {
             $errors[] = "Password is required to delete your account.";
         } else {
-            $stmt = $mysqli->prepare("SELECT password_hash, profile_image, id_image, orcr_image, account_type FROM users WHERE id = ? LIMIT 1");
+            $stmt = $mysqli->prepare("SELECT password_hash, profile_image, id_image, business_permit_image, orcr_image, account_type FROM users WHERE id = ? LIMIT 1");
             if ($stmt) {
                 $stmt->bind_param("i", $userId);
                 $stmt->execute();
-                $stmt->bind_result($curHash, $pImg, $idImg, $orcrImg, $accType);
+                $stmt->bind_result($curHash, $pImg, $idImg, $businessPermitImg, $orcrImg, $accType);
                 if ($stmt->fetch() && password_verify($delPassword, (string) $curHash)) {
                     $stmt->close();
 
@@ -155,6 +178,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     }
                     if (!empty($idImg) && file_exists(__DIR__ . "/uploads/ids/" . $idImg)) {
                         @unlink(__DIR__ . "/uploads/ids/" . $idImg);
+                    }
+                    if (!empty($businessPermitImg) && file_exists(__DIR__ . "/uploads/business_permits/" . $businessPermitImg)) {
+                        @unlink(__DIR__ . "/uploads/business_permits/" . $businessPermitImg);
                     }
                     if (!empty($orcrImg) && file_exists(__DIR__ . "/uploads/orcr/" . $orcrImg)) {
                         @unlink(__DIR__ . "/uploads/orcr/" . $orcrImg);
@@ -234,9 +260,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $shouldChangePassword = $newPassword !== "" || $confirmPassword !== "";
 
         if ($isStore) {
-            foreach (["store_name", "store_contact", "store_address", "store_lat", "store_lng", "store_category"] as $field) {
+            foreach (["store_name", "store_contact", "store_address", "store_lat", "store_lng", "store_hours", "store_category"] as $field) {
                 $profile[$field] = trim($_POST[$field] ?? "");
             }
+            $profile["store_is_open"] = ($_POST["store_is_open"] ?? (string) $profile["store_is_open"]) === "1" ? 1 : 0;
     } elseif ($isDriver) {
         $profile["vehicle_registration"] = trim($_POST["vehicle_registration"] ?? "");
     } else {
@@ -267,6 +294,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     if ($isStore) {
         if ($profile["store_name"] === "" || $profile["store_contact"] === "" || $profile["store_address"] === "" || $profile["store_hours"] === "") {
             $errors[] = "Store name, contact, address, and hours are required.";
+        }
+        if ($profile["store_category"] === "") {
+            $errors[] = "Store category is required.";
         }
         if ($profile["store_lat"] === "" || $profile["store_lng"] === "" || !is_numeric($profile["store_lat"]) || !is_numeric($profile["store_lng"])) {
             $errors[] = "Pin a valid store location on the map.";
@@ -311,6 +341,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     // Handle Driver ID & ORCR File Uploads
     $newIdImage = $profile["id_image"];
+    $newBusinessPermitImage = $profile["business_permit_image"];
     $newOrcrImage = $profile["orcr_image"];
 
     if ($isDriver && !$errors) {
@@ -345,6 +376,31 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 if (move_uploaded_file($_FILES["orcr_image"]["tmp_name"], $dest2)) {
                     $newOrcrImage = $newOrcrFilename;
                 }
+            }
+        }
+    }
+
+    if ($isStore && !$errors) {
+        if (isset($_FILES["id_image"]) && is_uploaded_file($_FILES["id_image"]["tmp_name"])) {
+            $ext = strtolower(pathinfo($_FILES["id_image"]["name"], PATHINFO_EXTENSION));
+            if (!in_array($ext, $allowedExts, true)) {
+                $errors[] = "Valid ID image must be JPG, PNG, or WEBP.";
+            } else {
+                $uploadsDir = __DIR__ . DIRECTORY_SEPARATOR . "uploads" . DIRECTORY_SEPARATOR . "ids";
+                if (!is_dir($uploadsDir)) @mkdir($uploadsDir, 0777, true);
+                $newIdFilename = bin2hex(random_bytes(8)) . "_" . time() . "." . $ext;
+                if (move_uploaded_file($_FILES["id_image"]["tmp_name"], $uploadsDir . DIRECTORY_SEPARATOR . $newIdFilename)) $newIdImage = $newIdFilename;
+            }
+        }
+        if (isset($_FILES["business_permit_image"]) && is_uploaded_file($_FILES["business_permit_image"]["tmp_name"])) {
+            $ext = strtolower(pathinfo($_FILES["business_permit_image"]["name"], PATHINFO_EXTENSION));
+            if (!in_array($ext, $allowedExts, true)) {
+                $errors[] = "Business permit must be JPG, PNG, or WEBP.";
+            } else {
+                $uploadsDir = __DIR__ . DIRECTORY_SEPARATOR . "uploads" . DIRECTORY_SEPARATOR . "business_permits";
+                if (!is_dir($uploadsDir)) @mkdir($uploadsDir, 0777, true);
+                $newPermitFilename = bin2hex(random_bytes(8)) . "_" . time() . "." . $ext;
+                if (move_uploaded_file($_FILES["business_permit_image"]["tmp_name"], $uploadsDir . DIRECTORY_SEPARATOR . $newPermitFilename)) $newBusinessPermitImage = $newPermitFilename;
             }
         }
     }
@@ -395,14 +451,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 "UPDATE users
                  SET first_name = ?, middle_name = ?, last_name = ?, contact = ?, email = ?,
                      store_name = ?, store_contact = ?, store_address = ?, store_lat = ?, store_lng = ?,
-                     store_hours = ?, store_category = ?, profile_image = ?
+                     store_hours = ?, store_is_open = ?, store_category = ?, id_image = ?, business_permit_image = ?, profile_image = ?
                      {$passwordSql}
                  WHERE id = ?"
             );
             if ($stmt) {
                 if ($shouldChangePassword) {
                     $stmt->bind_param(
-                        "ssssssssddssssi",
+                        "ssssssssddsisssssi",
                         $profile["first_name"],
                         $profile["middle_name"],
                         $profile["last_name"],
@@ -414,14 +470,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         $lat,
                         $lng,
                         $profile["store_hours"],
+                        $profile["store_is_open"],
                         $storeCat,
+                        $newIdImage,
+                        $newBusinessPermitImage,
                         $newProfileImage,
                         $newHash,
                         $userId
                     );
                 } else {
                     $stmt->bind_param(
-                        "ssssssssddsssi",
+                        "ssssssssddsissssi",
                         $profile["first_name"],
                         $profile["middle_name"],
                         $profile["last_name"],
@@ -433,7 +492,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         $lat,
                         $lng,
                         $profile["store_hours"],
+                        $profile["store_is_open"],
                         $storeCat,
+                        $newIdImage,
+                        $newBusinessPermitImage,
                         $newProfileImage,
                         $userId
                     );
@@ -1018,6 +1080,19 @@ if ($isStore) {
             font-weight: 600; cursor: pointer; transition: background .15s;
         }
         .pm-cancel:hover { background: #F1F5F9; }
+        .pm-save {
+            padding: 10px 22px;
+            border-radius: 12px;
+            border: none;
+            background: linear-gradient(135deg, #FF5B2E, #E04A1F);
+            color: #fff;
+            font: inherit;
+            font-size: 13.5px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: filter .15s ease;
+        }
+        .pm-save:hover { filter: brightness(.92); }
         .profile-map-wrapper {
             position: relative;
             width: 100%;
@@ -1125,14 +1200,31 @@ if ($isStore) {
             <?php endif; ?>
 
             <?php if ($notice !== ""): ?>
-                <div class="notice success"><?php echo escape($notice); ?></div>
+                <div class="notice success" id="profile-notice"><span><?php echo escape($notice); ?></span><button type="button" class="notice-dismiss" aria-label="Dismiss notification">&times;</button></div>
             <?php endif; ?>
             <?php if ($errors): ?>
-                <div class="notice error">
-                    <?php foreach ($errors as $error): ?>
-                        <div><?php echo escape($error); ?></div>
-                    <?php endforeach; ?>
+                <div class="notice error" id="profile-notice">
+                    <div><?php foreach ($errors as $error): ?><div><?php echo escape($error); ?></div><?php endforeach; ?></div>
+                    <button type="button" class="notice-dismiss" aria-label="Dismiss notification">&times;</button>
                 </div>
+            <?php endif; ?>
+
+            <?php if ($isStore): ?>
+                <form method="post" id="store-status-form">
+                <input type="hidden" name="store_status_update" value="1">
+                <input type="hidden" name="store_is_open" id="store-status-value" value="<?php echo $profile["store_is_open"] === 1 ? "1" : "0"; ?>">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 18px;padding:14px 16px;border:1px solid #E2E8F0;border-radius:14px;background:#F8FAFC;">
+                    <div>
+                        <strong style="display:block;color:#0F172A;font-size:15px;">Store status</strong>
+                        <small id="store-status-label" style="color:#64748B;"><?php echo $profile["store_is_open"] === 1 ? "Open — accepting orders" : "Closed — not shown on the map"; ?></small>
+                    </div>
+                    <label style="position:relative;display:inline-flex;width:52px;height:30px;flex:none;cursor:pointer;">
+                        <input type="checkbox" id="store_is_open" <?php echo $profile["store_is_open"] === 1 ? "checked" : ""; ?> style="opacity:0;width:0;height:0;">
+                        <span id="store-status-track" style="position:absolute;inset:0;border-radius:999px;background:<?php echo $profile["store_is_open"] === 1 ? '#10B981' : '#CBD5E1'; ?>;transition:.2s;"></span>
+                        <span id="store-status-knob" style="position:absolute;top:4px;left:<?php echo $profile["store_is_open"] === 1 ? '26px' : '4px'; ?>;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.2);transition:.2s;"></span>
+                    </label>
+                </div>
+                </form>
             <?php endif; ?>
 
             <form method="post" enctype="multipart/form-data" class="form-stack">
@@ -1224,8 +1316,8 @@ if ($isStore) {
                         <input type="text" id="store_contact" name="store_contact" value="<?php echo escape($profile["store_contact"]); ?>" required>
                     </div>
                     <div class="field">
-                        <label for="store_category">Store category</label>
-                        <select id="store_category" name="store_category" style="height:44px;padding:0 12px;border:1px solid rgba(255,91,46,.22);border-radius:10px;font-size:13.5px;outline:none;width:100%;background:#fff;box-sizing:border-box;">
+                        <label for="store_category">Store category <span style="color:#EF4444;">*</span></label>
+                        <select id="store_category" name="store_category" required style="height:44px;padding:0 12px;border:1px solid rgba(255,91,46,.22);border-radius:10px;font-size:13.5px;outline:none;width:100%;background:#fff;box-sizing:border-box;">
                             <option value="">&mdash; Select a category &mdash;</option>
                             <?php foreach ($prof_categories as $pc): ?>
                                 <option value="<?php echo escape($pc['slug']); ?>" <?php echo $profile['store_category'] === $pc['slug'] ? 'selected' : ''; ?>>
@@ -1251,6 +1343,23 @@ if ($isStore) {
                     <div class="field">
                         <label for="store_hours">Store hours</label>
                         <input type="text" id="store_hours" name="store_hours" value="<?php echo escape($profile["store_hours"]); ?>" placeholder="e.g. Mon-Sun, 8:00 AM - 9:00 PM" required>
+                    </div>
+                    <div class="field">
+                        <label>Store verification documents</label>
+                        <div class="driver-doc-grid">
+                            <div class="driver-doc-card">
+                                <label for="id_image">Owner Valid ID</label>
+                                <?php if (!empty($profile["id_image"])): ?><img class="driver-doc-thumb" src="uploads/ids/<?php echo escape($profile["id_image"]); ?>" alt="Store owner ID">
+                                <?php else: ?><div style="height:140px;background:#E2E8F0;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#64748B;font-size:13px;">No ID uploaded</div><?php endif; ?>
+                                <input type="file" id="id_image" name="id_image" accept="image/*">
+                            </div>
+                            <div class="driver-doc-card">
+                                <label for="business_permit_image">Business Permit</label>
+                                <?php if (!empty($profile["business_permit_image"])): ?><img class="driver-doc-thumb" src="uploads/business_permits/<?php echo escape($profile["business_permit_image"]); ?>" alt="Business permit">
+                                <?php else: ?><div style="height:140px;background:#E2E8F0;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#64748B;font-size:13px;">No permit uploaded</div><?php endif; ?>
+                                <input type="file" id="business_permit_image" name="business_permit_image" accept="image/*">
+                            </div>
+                        </div>
                     </div>
                     <input type="hidden" id="map_lat" name="store_lat" value="<?php echo escape($profile["store_lat"]); ?>">
                     <input type="hidden" id="map_lng" name="store_lng" value="<?php echo escape($profile["store_lng"]); ?>">
@@ -1329,6 +1438,22 @@ if ($isStore) {
             </div>
         </section>
     </main>
+
+    <?php if ($isStore): ?>
+    <div class="pm-overlay" id="store-status-overlay" role="dialog" aria-modal="true" aria-labelledby="store-status-title">
+        <div class="pm-box" style="max-width:440px;">
+            <div class="pm-head">
+                <h2 id="store-status-title">Change store status</h2>
+                <button class="pm-close" type="button" id="close-store-status" aria-label="Close">&times;</button>
+            </div>
+            <p id="store-status-message" style="margin:0;color:#475569;line-height:1.5;"></p>
+            <div class="pm-actions">
+                <button class="pm-cancel" type="button" id="cancel-store-status">Cancel</button>
+                <button type="button" class="pm-save" id="confirm-store-status">Confirm</button>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
 
     <!-- DELETE ACCOUNT CONFIRMATION MODAL -->
     <div class="pm-overlay" id="delete-account-overlay" role="dialog" aria-modal="true" aria-labelledby="delete-acc-title">
@@ -1413,6 +1538,41 @@ if ($isStore) {
             deleteAccOverlay.addEventListener("click", function(e) {
                 if (e.target === deleteAccOverlay) closeDeleteAccModal();
             });
+        }
+        const profileNotice = document.getElementById("profile-notice");
+        if (profileNotice) {
+            const dismissProfileNotice = () => {
+                profileNotice.style.transition = "opacity .25s ease, transform .25s ease";
+                profileNotice.style.opacity = "0";
+                profileNotice.style.transform = "translateY(-4px)";
+                setTimeout(() => profileNotice.remove(), 260);
+            };
+            profileNotice.querySelector(".notice-dismiss")?.addEventListener("click", dismissProfileNotice);
+            setTimeout(dismissProfileNotice, 5000);
+        }
+        const storeStatusToggle = document.getElementById("store_is_open");
+        if (storeStatusToggle) {
+            const statusOverlay = document.getElementById("store-status-overlay");
+            const statusValue = document.getElementById("store-status-value");
+            const statusMessage = document.getElementById("store-status-message");
+            const closeStatusModal = () => { if (statusOverlay) statusOverlay.classList.remove("open"); };
+            let pendingStatus = storeStatusToggle.checked;
+            storeStatusToggle.addEventListener("change", () => {
+                pendingStatus = storeStatusToggle.checked;
+                storeStatusToggle.checked = !pendingStatus;
+                if (statusMessage) statusMessage.textContent = pendingStatus
+                    ? "Open this store and show it on the customer map?"
+                    : "Close this store and remove it from the customer map?";
+                if (statusOverlay) statusOverlay.classList.add("open");
+            });
+            document.getElementById("confirm-store-status")?.addEventListener("click", () => {
+                storeStatusToggle.checked = pendingStatus;
+                if (statusValue) statusValue.value = pendingStatus ? "1" : "0";
+                document.getElementById("store-status-form")?.submit();
+            });
+            document.getElementById("close-store-status")?.addEventListener("click", closeStatusModal);
+            document.getElementById("cancel-store-status")?.addEventListener("click", closeStatusModal);
+            statusOverlay?.addEventListener("click", (event) => { if (event.target === statusOverlay) closeStatusModal(); });
         }
 
         document.addEventListener("keydown", function(e) {

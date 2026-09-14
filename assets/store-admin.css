@@ -1431,6 +1431,10 @@ body.store-admin-body {
   background: #10B981;
 }
 
+.store-badge-open.closed::before {
+  background: #EF4444;
+}
+
 .store-hero-address {
   margin: 0;
   color: #64748B;

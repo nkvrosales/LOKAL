@@ -394,10 +394,10 @@ $showAddModal = !empty($errors) && ($_POST["action"] ?? "") === "add";
                                                 onclick="openEditModal(<?php echo (int) $cat['id']; ?>, '<?php echo escape(addslashes($cat['name'])); ?>', '<?php echo escape(addslashes($cat['slug'])); ?>', <?php echo (int) $cat['sort_order']; ?>)">
                                                 Edit
                                             </button>
-                                            <form method="post" style="display:inline">
+                                            <form method="post" style="display:inline" class="category-toggle-form" data-category-name="<?php echo escape($cat['name']); ?>" data-next-state="<?php echo $cat['is_active'] ? 'inactive' : 'active'; ?>">
                                                 <input type="hidden" name="action" value="toggle">
                                                 <input type="hidden" name="id" value="<?php echo (int) $cat['id']; ?>">
-                                                <button type="submit"
+                                                <button type="button"
                                                     class="<?php echo $cat['is_active'] ? 'cat-btn-toggle-on' : 'cat-btn-toggle-off'; ?>">
                                                     <?php echo $cat['is_active'] ? 'Deactivate' : 'Activate'; ?>
                                                 </button>
@@ -456,6 +456,18 @@ $showAddModal = !empty($errors) && ($_POST["action"] ?? "") === "add";
         </div>
     </div>
 
+    <div id="toggle-confirm-modal" class="cat-modal-backdrop" hidden>
+        <div class="cat-modal-panel" role="dialog" aria-modal="true" aria-labelledby="toggle-confirm-title" style="max-width:420px;">
+            <button type="button" class="cat-modal-close" id="close-toggle-confirm" aria-label="Close">&times;</button>
+            <h2 id="toggle-confirm-title">Confirm category status</h2>
+            <p id="toggle-confirm-message" style="color:#475569;line-height:1.5;"></p>
+            <div class="cat-modal-actions">
+                <button type="button" class="cat-btn-cancel" id="cancel-toggle-confirm">Cancel</button>
+                <button type="button" class="cat-btn-save" id="confirm-toggle">Confirm</button>
+            </div>
+        </div>
+    </div>
+
     <!-- ── Edit Category Modal ────────────────────────────────────────────────── -->
     <div id="edit-modal" class="cat-modal-backdrop" hidden>
         <div class="cat-modal-panel" role="dialog" aria-modal="true" aria-labelledby="edit-modal-title">
@@ -490,6 +502,8 @@ $showAddModal = !empty($errors) && ($_POST["action"] ?? "") === "add";
     <script>
         const addModal  = document.getElementById("add-modal");
         const editModal = document.getElementById("edit-modal");
+        const toggleModal = document.getElementById("toggle-confirm-modal");
+        let pendingToggleForm = null;
 
         function openAddModal()  { addModal.hidden = false;  document.getElementById("add-name").focus(); }
         function closeAddModal() { addModal.hidden = true; }
@@ -503,13 +517,31 @@ $showAddModal = !empty($errors) && ($_POST["action"] ?? "") === "add";
             document.getElementById("edit-name").focus();
         }
         function closeEditModal() { editModal.hidden = true; }
+        function closeToggleModal() { if (toggleModal) toggleModal.hidden = true; pendingToggleForm = null; }
+
+        document.querySelectorAll(".category-toggle-form").forEach(form => {
+            form.querySelector("button[type='button']").addEventListener("click", () => {
+                pendingToggleForm = form;
+                const categoryName = form.dataset.categoryName || "this category";
+                const nextState = form.dataset.nextState || "active";
+                document.getElementById("toggle-confirm-message").textContent =
+                    `Are you sure you want to ${nextState === "active" ? "activate" : "deactivate"} ${categoryName}?`;
+                toggleModal.hidden = false;
+            });
+        });
+        document.getElementById("confirm-toggle").addEventListener("click", () => {
+            if (pendingToggleForm) pendingToggleForm.submit();
+        });
+        document.getElementById("close-toggle-confirm").addEventListener("click", closeToggleModal);
+        document.getElementById("cancel-toggle-confirm").addEventListener("click", closeToggleModal);
 
         // Close on backdrop click
         addModal.addEventListener("click",  e => { if (e.target === addModal)  closeAddModal(); });
         editModal.addEventListener("click", e => { if (e.target === editModal) closeEditModal(); });
+        toggleModal.addEventListener("click", e => { if (e.target === toggleModal) closeToggleModal(); });
 
         document.addEventListener("keydown", e => {
-            if (e.key === "Escape") { closeAddModal(); closeEditModal(); }
+            if (e.key === "Escape") { closeAddModal(); closeEditModal(); closeToggleModal(); }
         });
 
         function dismissCatNotice(id) {

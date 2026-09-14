@@ -12,7 +12,8 @@ $user_id    = (int) ($_SESSION["user_id"] ?? 0);
 $user_name  = $_SESSION["user_name"] ?? "Store";
 $store_name = "";
 $errors     = [];
-$notice     = "";
+$notice     = $_SESSION["product_notice"] ?? "";
+unset($_SESSION["product_notice"]);
 
 $format_price_label = static function ($price): string {
     if ($price === null || $price === "") return "";
@@ -56,9 +57,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $ins = $mysqli->prepare("INSERT INTO store_products (store_user_id, product_name, product_description, product_price, product_image, is_active) VALUES (?,?,?,?,?,1)");
             if ($ins) {
                 $ins->bind_param("issds", $user_id, $name, $desc_val, $price_val, $img_file);
-                $notice = $ins->execute() ? "Product added." : "Unable to add product.";
-                if (!$ins->execute()) $errors[] = "Unable to add product.";
+                $added = $ins->execute();
                 $ins->close();
+                if ($added) {
+                    $_SESSION["product_notice"] = "Product added.";
+                    header("Location: store_products.php");
+                    exit;
+                }
+                $errors[] = "Unable to add product.";
             }
         }
     }
