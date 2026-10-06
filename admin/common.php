@@ -66,9 +66,9 @@ function admin_fetch_accounts(mysqli $mysqli): array
 {
     $accounts = [];
     $result = $mysqli->query(
-    "SELECT id, account_type, store_name, store_address, store_lat, store_lng,
+    "SELECT id, account_type, store_name, store_address, store_lat, store_lng, is_verified,
         user_address, user_lat, user_lng, first_name, middle_name, last_name,
-        contact, email, created_at, is_approved, id_image, vehicle_registration, orcr_image, profile_image
+        contact, email, created_at, is_approved, id_image, business_permit_image, vehicle_registration, orcr_image, profile_image
      FROM users
      ORDER BY FIELD(account_type, 'admin', 'store', 'driver', 'user'), created_at DESC, id DESC"
     );
@@ -85,6 +85,7 @@ function admin_fetch_accounts(mysqli $mysqli): array
             "store_address" => (string) ($row["store_address"] ?? ""),
             "store_lat" => $row["store_lat"] !== null ? (float) $row["store_lat"] : null,
             "store_lng" => $row["store_lng"] !== null ? (float) $row["store_lng"] : null,
+            "is_verified" => isset($row["is_verified"]) ? (int) $row["is_verified"] : 0,
             "user_address" => (string) ($row["user_address"] ?? ""),
             "user_lat" => $row["user_lat"] !== null ? (float) $row["user_lat"] : null,
             "user_lng" => $row["user_lng"] !== null ? (float) $row["user_lng"] : null,
@@ -95,6 +96,7 @@ function admin_fetch_accounts(mysqli $mysqli): array
             "email" => (string) ($row["email"] ?? ""),
             "is_approved" => isset($row["is_approved"]) ? (int) $row["is_approved"] : 0,
             "id_image" => (string) ($row["id_image"] ?? ""),
+            "business_permit_image" => (string) ($row["business_permit_image"] ?? ""),
             "vehicle_registration" => (string) ($row["vehicle_registration"] ?? ""),
             "orcr_image" => (string) ($row["orcr_image"] ?? ""),
             "profile_image" => (string) ($row["profile_image"] ?? ""),

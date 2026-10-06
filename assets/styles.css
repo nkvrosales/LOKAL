@@ -616,6 +616,12 @@ a:hover {
   box-shadow: none;
 }
 
+.map-marker.store.closed,
+.map-marker.store.is-closed {
+  background: #EF4444;
+  box-shadow: none;
+}
+
 .map-marker.home {
   background: #3B82F6;
   box-shadow: none;

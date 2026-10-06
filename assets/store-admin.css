@@ -1796,6 +1796,29 @@ body.store-admin-body {
   color: #FF5B2E !important;
 }
 
+/* Store trust verification */
+.verified-store-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 800;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.admin-verification-form { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.admin-verify-btn, .admin-unverify-btn { border: 0; border-radius: 7px; padding: 7px 10px; font-weight: 700; cursor: pointer; }
+.admin-verify-btn { background: #2563eb; color: #fff; }
+.admin-unverify-btn { background: #fee2e2; color: #b91c1c; }
+.admin-notice { margin: 0 0 14px; padding: 10px 12px; border-radius: 8px; font-weight: 600; }
+.admin-notice.success { color: #166534; background: #dcfce7; }
+.admin-notice.error { color: #991b1b; background: #fee2e2; }
+
 .checkout-breakdown-card p {
   display: flex !important;
   align-items: center !important;

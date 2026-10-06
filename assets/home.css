@@ -2958,3 +2958,47 @@ body.cart-screen {
 .cart-store-checkout:active {
   text-decoration: none;
 }
+
+.map-marker.store.closed,
+.map-marker.store.is-closed {
+  background: #EF4444 !important;
+  box-shadow: none;
+}
+
+.store-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.store-status-badge.open {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10B981;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.store-status-badge.closed {
+  background: rgba(239, 68, 68, 0.12);
+  color: #EF4444;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+/* Store trust verification */
+.verified-store-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.35;
+  vertical-align: middle;
+  white-space: nowrap;
+}

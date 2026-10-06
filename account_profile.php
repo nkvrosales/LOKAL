@@ -1216,7 +1216,7 @@ if ($isStore) {
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 18px;padding:14px 16px;border:1px solid #E2E8F0;border-radius:14px;background:#F8FAFC;">
                     <div>
                         <strong style="display:block;color:#0F172A;font-size:15px;">Store status</strong>
-                        <small id="store-status-label" style="color:#64748B;"><?php echo $profile["store_is_open"] === 1 ? "Open — accepting orders" : "Closed — not shown on the map"; ?></small>
+                        <small id="store-status-label" style="color:#64748B;"><?php echo $profile["store_is_open"] === 1 ? "Open — accepting orders" : "Closed — shown as closed on map"; ?></small>
                     </div>
                     <label style="position:relative;display:inline-flex;width:52px;height:30px;flex:none;cursor:pointer;">
                         <input type="checkbox" id="store_is_open" <?php echo $profile["store_is_open"] === 1 ? "checked" : ""; ?> style="opacity:0;width:0;height:0;">
@@ -1561,8 +1561,8 @@ if ($isStore) {
                 pendingStatus = storeStatusToggle.checked;
                 storeStatusToggle.checked = !pendingStatus;
                 if (statusMessage) statusMessage.textContent = pendingStatus
-                    ? "Open this store and show it on the customer map?"
-                    : "Close this store and remove it from the customer map?";
+                    ? "Open this store and show it as open on the customer map?"
+                    : "Close this store and show it as closed on the customer map?";
                 if (statusOverlay) statusOverlay.classList.add("open");
             });
             document.getElementById("confirm-store-status")?.addEventListener("click", () => {

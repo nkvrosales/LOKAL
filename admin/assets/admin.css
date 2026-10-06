@@ -495,6 +495,26 @@ body.admin-modal-open {
   color: rgba(0, 0, 0, 0.66) !important;
 }
 
+/* Store verification review */
+.admin-verification-form { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.admin-verify-btn, .admin-unverify-btn, .admin-confirm-verify-btn, .admin-cancel-btn { border: 1px solid rgba(255, 91, 46, 0.24); border-radius: 10px; padding: 8px 11px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.admin-verify-btn, .admin-confirm-verify-btn { color: #fff; background: #FF5B2E; }
+.admin-verify-btn:hover, .admin-confirm-verify-btn:hover { background: #e94b22; }
+.admin-confirm-verify-btn:disabled { cursor: not-allowed; opacity: .45; }
+.admin-unverify-btn, .admin-cancel-btn { color: #FF5B2E; background: rgba(255, 91, 46, 0.1); }
+.admin-verification-modal .admin-modal-head p { margin: 4px 0 0; color: rgba(0, 0, 0, .65); font-size: 13px; }
+.verification-review-form { display: grid; gap: 16px; }
+.verification-document-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.verification-document-card { display: grid; gap: 10px; padding: 12px; border: 1px solid rgba(255, 91, 46, .18); border-radius: 12px; background: rgba(255, 91, 46, .04); }
+.verification-document-card h3 { margin: 0; color: #FF5B2E; font-size: 14px; }
+.verification-document-card a { display: block; min-height: 180px; background: #fff; border-radius: 9px; overflow: hidden; }
+.verification-document-card img { display: block; width: 100%; height: 210px; object-fit: contain; background: #fff; }
+.verification-doc-missing { display: grid; min-height: 180px; place-items: center; margin: 0; color: rgba(0, 0, 0, .58); background: #fff; border-radius: 9px; text-align: center; }
+.verification-check { display: flex; gap: 8px; align-items: flex-start; color: rgba(0, 0, 0, .78); font-size: 13px; font-weight: 600; cursor: pointer; }
+.verification-check input { margin-top: 2px; accent-color: #FF5B2E; }
+.verification-modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+@media (max-width: 640px) { .verification-document-grid { grid-template-columns: 1fr; } }
+
 @media (max-width: 920px) {
   .admin-hero {
     grid-template-columns: 1fr;

@@ -121,7 +121,7 @@ $store = null;
 $products = [];
 
 $stmt = $mysqli->prepare(
-    "SELECT id, store_name, first_name, last_name, store_address, store_lat, store_lng, store_contact, contact, email, store_hours, store_is_open, store_category, profile_image
+    "SELECT id, store_name, first_name, last_name, store_address, store_lat, store_lng, store_contact, contact, email, store_hours, store_is_open, is_verified, store_category, profile_image
      FROM users
      WHERE id = ?
        AND account_type = 'store'
@@ -143,6 +143,7 @@ if ($stmt) {
         $email,
         $storeHours,
         $storeIsOpen,
+        $isVerified,
         $storeCategory,
         $profileImage
     );
@@ -167,6 +168,7 @@ if ($stmt) {
             "email" => (string) ($email ?? ""),
             "hours" => trim((string) ($storeHours ?? "")),
             "is_open" => (int) ($storeIsOpen ?? 1) === 1,
+            "is_verified" => (int) ($isVerified ?? 0) === 1,
             "category" => (string) ($storeCategory ?? "Store"),
             "profile_image" => (string) ($profileImage ?? ""),
         ];
@@ -358,7 +360,7 @@ $storeForCart["products"] = $products;
                     </a>
                     <h1>
                         <?php echo escape($store["name"]); ?>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="#3B82F6" stroke="#fff" stroke-width="2"><path d="M12 2l2.4 5.2 5.6.8-4 4.1 1 5.7-5-2.8-5 2.8 1-5.7-4-4.1 5.6-.8z"/></svg>
+                        <?php if ($store["is_verified"]): ?><span class="verified-store-badge" title="Verified by Lokal">✓ Verified</span><?php endif; ?>
                     </h1>
                     <div class="store-hero-badges">
                         <span class="store-badge-cat"><?php echo escape($store["category"]); ?></span>
@@ -1142,9 +1144,10 @@ $storeForCart["products"] = $products;
             L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
                 attribution: "&copy; OpenStreetMap contributors"
             }).addTo(map);
+            const isStoreOpen = store.is_open !== false && store.is_open !== 0 && store.is_open !== "0";
             const storeIcon = L.divIcon({
                 className: "custom-marker",
-                html: `<div class="map-marker store">
+                html: `<div class="map-marker store ${isStoreOpen ? "" : "closed"}">
                         <svg class="marker-svg" viewBox="0 0 24 24" aria-hidden="true">
                             <path d="M3 9l2-5h14l2 5"></path>
                             <path d="M5 9v11h14V9"></path>

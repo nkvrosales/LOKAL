@@ -81,7 +81,7 @@ if (!$is_store) {
     }
 
     $stmt = $mysqli->prepare(
-        "SELECT id, store_name, first_name, last_name, store_address, store_lat, store_lng, store_contact, contact, store_category, store_is_open
+        "SELECT id, store_name, first_name, last_name, store_address, store_lat, store_lng, store_contact, contact, store_category, store_is_open, is_verified
          FROM users
          WHERE account_type = 'store'
            AND store_lat IS NOT NULL
@@ -100,13 +100,11 @@ if (!$is_store) {
             $store_contact,
             $default_contact,
             $store_category,
-            $store_is_open
+            $store_is_open,
+            $is_verified
         );
         while ($stmt->fetch()) {
             $has_registered_stores = true;
-            if ((int) ($store_is_open ?? 0) !== 1) {
-                continue;
-            }
             $fallback_name = trim(($first_name ?? "") . " " . ($last_name ?? ""));
             $display_name = trim((string) ($store_name ?? ""));
             $display_contact = trim((string) ($store_contact ?? ""));
@@ -125,6 +123,8 @@ if (!$is_store) {
                 "lng" => (float) $store_lng,
                 "contact" => $display_contact,
                 "category" => trim((string) ($store_category ?? "")),
+                "is_open" => (int) ($store_is_open ?? 0) === 1,
+                "is_verified" => (int) ($is_verified ?? 0) === 1,
                 "products" => []
             ];
             $store_ids[(int) $store_id] = true;
@@ -178,17 +178,19 @@ if (!$is_store) {
                 "contact" => "+39 06 6880 1234",
                 "category" => "Restaurant",
                 "country" => "Italy",
+                "is_open" => true,
                 "products" => []
             ],
             [
                 "id" => "sample_2",
-                "name" => "Cozy Corner CafÃ©",
+                "name" => "Cozy Corner Café",
                 "address" => "303 Java Blvd, Springfield",
                 "lat" => 42.1015,
                 "lng" => -72.5898,
                 "contact" => "+1 413 555 0199",
                 "category" => "Coffee",
                 "country" => "USA",
+                "is_open" => true,
                 "products" => []
             ],
             [
@@ -200,6 +202,7 @@ if (!$is_store) {
                 "contact" => "+351 21 342 5678",
                 "category" => "Restaurant",
                 "country" => "Portugal",
+                "is_open" => true,
                 "products" => []
             ],
             [
@@ -211,6 +214,7 @@ if (!$is_store) {
                 "contact" => "+33 1 42 60 31 25",
                 "category" => "Restaurant",
                 "country" => "France",
+                "is_open" => true,
                 "products" => []
             ]
         ];
@@ -251,8 +255,8 @@ if (empty($sidebar_categories)) {
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Home | Lokal</title>
-    <link rel="stylesheet" href="assets/styles.css?v=primary-bw-icons-1">
-    <link rel="stylesheet" href="assets/home.css?v=cart-order-pos-fix-1">
+    <link rel="stylesheet" href="assets/styles.css?v=store-closed-icon-1">
+    <link rel="stylesheet" href="assets/home.css?v=store-closed-icon-1">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 </head>
 <body class="home-screen <?php echo $is_store ? "account-store" : "account-user"; ?>">
@@ -526,6 +530,20 @@ if (empty($sidebar_categories)) {
             popupAnchor: [0, -32]
         });
 
+        const storeClosedIcon = L.divIcon({
+            className: "custom-marker",
+            html: `<div class="map-marker store closed">
+                    <svg class="marker-svg" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M3 9l2-5h14l2 5"></path>
+                        <path d="M5 9v11h14V9"></path>
+                        <path d="M9 20v-5h6v5"></path>
+                    </svg>
+                </div>`,
+            iconSize: [34, 34],
+            iconAnchor: [17, 34],
+            popupAnchor: [0, -32]
+        });
+
         const storeHomeIcon = L.divIcon({
             className: "custom-marker",
             html: `<div class="map-marker store-home">
@@ -681,11 +699,17 @@ if (empty($sidebar_categories)) {
             }
 
             stores.forEach((store) => {
-                const marker = L.marker([store.lat, store.lng], { icon: storeIcon }).addTo(map);
+                const isOpen = store.is_open !== false && store.is_open !== 0 && store.is_open !== "0";
+                const marker = L.marker([store.lat, store.lng], {
+                    icon: isOpen ? storeIcon : storeClosedIcon
+                }).addTo(map);
                 const name = escapeHtml(store.name && store.name !== "" ? store.name : "Store");
                 const address = escapeHtml(store.address && store.address !== "" ? store.address : "Store location");
                 const contact = store.contact && store.contact !== "" ? `<br>Contact: ${escapeHtml(store.contact)}` : "";
-                marker.bindTooltip(`<strong>${name}</strong><br>${address}${contact}`, {
+                const statusBadge = isOpen
+                    ? `<span style="display:inline-block;margin-top:3px;padding:2px 7px;font-size:10.5px;font-weight:700;color:#10B981;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.25);border-radius:999px;">OPEN</span>`
+                    : `<span style="display:inline-block;margin-top:3px;padding:2px 7px;font-size:10.5px;font-weight:700;color:#EF4444;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.25);border-radius:999px;">CLOSED</span>`;
+                marker.bindTooltip(`<strong>${name}</strong> &bull; ${statusBadge}<br>${address}${contact}`, {
                     direction: "top",
                     offset: [0, -35],
                     opacity: 0.96
@@ -1453,9 +1477,14 @@ if (empty($sidebar_categories)) {
                     const name = escapeHtml(store.name || "Store");
                     const address = escapeHtml(store.address || "Address not provided");
                     const category = store.category ? escapeHtml(categoryMap[store.category] || store.category) : "";
+                    const isOpen = store.is_open !== false && store.is_open !== 0 && store.is_open !== "0";
+                    const isVerified = store.is_verified === true || store.is_verified === 1 || store.is_verified === "1";
 
-                    return `<div class="sidebar-store-card" data-store-id="${escapeHtml(String(store.id))}">
-                        <h3 class="sidebar-store-title">${name}</h3>
+                    return `<div class="sidebar-store-card${isOpen ? "" : " is-closed"}" data-store-id="${escapeHtml(String(store.id))}">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; width:100%; gap:8px; margin-bottom:6px;">
+                            <h3 class="sidebar-store-title" style="margin:0;">${name}${isVerified ? ' <span class="verified-store-badge" title="Verified by Lokal">✓ Verified</span>' : ""}</h3>
+                            <span class="store-status-badge ${isOpen ? "open" : "closed"}">${isOpen ? "Open" : "Closed"}</span>
+                        </div>
                         <p class="sidebar-store-address">${address}</p>
                         ${category ? `<p class="sidebar-store-category">${category}</p>` : ""}
                         <div>
