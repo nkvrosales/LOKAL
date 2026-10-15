@@ -180,8 +180,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             }
         }
     }
-    if (strlen($password) < 6) {
-        $errors[] = "Password must be at least 6 characters.";
+    if (
+        strlen($password) < 6 ||
+        !preg_match('/[A-Z]/', $password) ||
+        !preg_match('/[a-z]/', $password) ||
+        !preg_match('/[0-9]/', $password) ||
+        !preg_match('/[^A-Za-z0-9]/', $password)
+    ) {
+        $errors[] = "Password must be at least 6 characters and include an uppercase letter, a lowercase letter, a number, and a symbol.";
     }
     if ($password !== $confirm_password) {
         $errors[] = "Passwords do not match.";
@@ -320,6 +326,19 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 }
 
 // Fetch active categories for store dropdown
+$contactError = "";
+$passwordError = "";
+$formErrors = [];
+foreach ($errors as $error) {
+    if (strpos($error, "Phone number") === 0) {
+        $contactError = $error;
+    } elseif (strpos($error, "Password must") === 0) {
+        $passwordError = $error;
+    } else {
+        $formErrors[] = $error;
+    }
+}
+
 $reg_categories = [];
 $cat_res = $mysqli->query("SELECT name, slug FROM categories WHERE is_active = 1 ORDER BY sort_order ASC, name ASC");
 if ($cat_res) {
@@ -554,6 +573,23 @@ if ($cat_res) {
             box-shadow: 0 0 0 3px rgba(255, 77, 46, 0.12);
         }
 
+        .reg-field input[aria-invalid="true"] {
+            border-color: #DC2626;
+        }
+
+        .reg-field input[aria-invalid="true"]:focus {
+            border-color: #DC2626;
+            box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+        }
+
+        .reg-field-error {
+            min-height: 0;
+            color: #B91C1C;
+            font-size: 11.5px;
+            font-weight: 600;
+            line-height: 1.35;
+        }
+
         .reg-field input[type="file"] {
             padding: 4px 8px;
             font-size: 11.5px;
@@ -593,6 +629,33 @@ if ($cat_res) {
         }
         .reg-pw-wrap input {
             padding-right: 32px;
+        }
+        .password-requirements {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3px 8px;
+            margin-top: 4px;
+            color: #64748B;
+            font-size: 10.5px;
+            line-height: 1.35;
+        }
+        .password-requirement::before {
+            content: "○ ";
+            color: #94A3B8;
+            font-weight: 700;
+        }
+        .password-requirement.met {
+            color: #047857;
+        }
+        .password-requirement.met::before {
+            content: "✓ ";
+            color: #059669;
+        }
+        .password-error {
+            color: #B91C1C;
+            font-size: 11px;
+            font-weight: 600;
+            line-height: 1.35;
         }
         .reg-pw-btn {
             position: absolute;
@@ -1167,9 +1230,9 @@ if ($cat_res) {
                 </div>
 
                 <!-- Error Messages if any -->
-                <?php if ($errors): ?>
+                <?php if ($formErrors): ?>
                     <div class="reg-errors">
-                        <?php foreach ($errors as $error): ?>
+                        <?php foreach ($formErrors as $error): ?>
                             <div>• <?php echo escape($error); ?></div>
                         <?php endforeach; ?>
                     </div>
@@ -1216,7 +1279,8 @@ if ($cat_res) {
                         <div class="reg-grid-row reg-grid-2">
                             <div class="reg-field">
                                 <label for="contact">Phone Number <span style="color:#EF4444;">*</span></label>
-                                <input type="text" id="contact" name="contact" value="<?php echo escape($values["contact"]); ?>" placeholder="09123456789" maxlength="20" required>
+                                <input type="text" id="contact" name="contact" value="<?php echo escape($values["contact"]); ?>" placeholder="09123456789" inputmode="numeric" maxlength="11" aria-describedby="contact-error" aria-invalid="<?php echo $contactError !== "" ? "true" : "false"; ?>" required>
+                                <small id="contact-error" class="reg-field-error" aria-live="polite"><?php echo escape($contactError); ?></small>
                             </div>
                             <div class="reg-field">
                                 <label for="email">Email Address <span style="color:#EF4444;">*</span></label>
@@ -1337,11 +1401,19 @@ if ($cat_res) {
                             <div class="reg-field">
                                 <label for="password">Password <span style="color:#EF4444;">*</span></label>
                                 <div class="reg-pw-wrap">
-                                    <input type="password" id="password" name="password" placeholder="Min. 6 characters" required>
+                                    <input type="password" id="password" name="password" placeholder="Create a strong password" aria-describedby="password-requirements password-error" required>
                                     <button type="button" class="reg-pw-btn" onclick="togglePasswordVisibility('password', this)" title="Toggle password">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                                     </button>
                                 </div>
+                                <div id="password-requirements" class="password-requirements" aria-live="polite">
+                                    <span class="password-requirement" data-password-rule="length">At least 6 characters</span>
+                                    <span class="password-requirement" data-password-rule="uppercase">One uppercase letter</span>
+                                    <span class="password-requirement" data-password-rule="lowercase">One lowercase letter</span>
+                                    <span class="password-requirement" data-password-rule="number">One number</span>
+                                    <span class="password-requirement" data-password-rule="symbol">One symbol</span>
+                                </div>
+                                <small id="password-error" class="password-error" aria-live="polite"><?php echo escape($passwordError); ?></small>
                             </div>
                             <div class="reg-field">
                                 <label for="confirm_password">Confirm Password <span style="color:#EF4444;">*</span></label>
@@ -2054,18 +2126,65 @@ if ($cat_res) {
         // Pre-submit validation: warn if coordinates are missing or contact is invalid
         const regForm = document.getElementById("registration-form");
         if (regForm) {
-            regForm.addEventListener("submit", function(e) {
-                const contactVal = document.getElementById("contact")?.value.trim() || "";
+            const contactInput = document.getElementById("contact");
+            const contactError = document.getElementById("contact-error");
+            const passwordInput = document.getElementById("password");
+            const passwordError = document.getElementById("password-error");
+            const passwordRuleElements = document.querySelectorAll("[data-password-rule]");
+
+            function getPasswordRules(value) {
+                return {
+                    length: value.length >= 6,
+                    uppercase: /[A-Z]/.test(value),
+                    lowercase: /[a-z]/.test(value),
+                    number: /[0-9]/.test(value),
+                    symbol: /[^A-Za-z0-9]/.test(value)
+                };
+            }
+
+            function validatePassword(showError) {
+                const value = passwordInput?.value || "";
+                const rules = getPasswordRules(value);
+                passwordRuleElements.forEach((element) => {
+                    const rule = element.dataset.passwordRule;
+                    element.classList.toggle("met", Boolean(rules[rule]));
+                });
+                const valid = Object.values(rules).every(Boolean);
+                if (passwordError) {
+                    passwordError.textContent = showError && !valid
+                        ? "Password needs 6+ characters, uppercase and lowercase letters, a number, and a symbol."
+                        : "";
+                }
+                return valid;
+            }
+
+            function validateContact(showError) {
+                const contactVal = contactInput?.value.trim() || "";
+                let message = "";
                 if (contactVal && !/^[0-9]+$/.test(contactVal)) {
+                    message = "Phone number must contain numbers only.";
+                } else if (contactVal && (contactVal.length < 10 || contactVal.length > 11)) {
+                    message = "Phone number must be 10 or 11 digits (e.g. 09123456789).";
+                }
+
+                if (contactInput && contactError) {
+                    contactError.textContent = showError ? message : "";
+                    contactInput.setAttribute("aria-invalid", showError && message ? "true" : "false");
+                }
+                return message === "";
+            }
+
+            contactInput?.addEventListener("input", () => validateContact(true));
+            passwordInput?.addEventListener("input", () => validatePassword(true));
+            regForm.addEventListener("submit", function(e) {
+                if (!validateContact(true)) {
                     e.preventDefault();
-                    alert("Phone number must contain numbers only.");
-                    document.getElementById("contact")?.focus();
+                    contactInput?.focus();
                     return false;
                 }
-                if (contactVal && (contactVal.length < 10 || contactVal.length > 11)) {
+                if (!validatePassword(true)) {
                     e.preventDefault();
-                    alert("Phone number must be 10 or 11 digits (e.g. 09123456789).");
-                    document.getElementById("contact")?.focus();
+                    passwordInput?.focus();
                     return false;
                 }
 

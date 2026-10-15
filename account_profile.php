@@ -13,6 +13,7 @@ $isStore = $accountType === "store";
 $isDriver = $accountType === "driver";
 $errors = [];
 $notice = "";
+$deviceTokenShown = "";
 
 $profile = [
     "first_name"            => "",
@@ -143,7 +144,28 @@ function load_account_profile(mysqli $mysqli, int $userId): array
 $profile = load_account_profile($mysqli, $userId);
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
-    if ($isStore && isset($_POST["store_status_update"])) {
+    if ($isStore && isset($_POST["generate_device_token"])) {
+        try {
+            $deviceTokenShown = bin2hex(random_bytes(32));
+            $tokenHash = hash("sha256", $deviceTokenShown);
+            $tokenStmt = $mysqli->prepare("UPDATE users SET store_device_token_hash = ? WHERE id = ? AND account_type = 'store' LIMIT 1");
+            if ($tokenStmt) {
+                $tokenStmt->bind_param("si", $tokenHash, $userId);
+                if ($tokenStmt->execute()) {
+                    $notice = "Device token generated. Copy it now; it will not be shown again.";
+                } else {
+                    $deviceTokenShown = "";
+                    $errors[] = "Unable to generate the device token.";
+                }
+                $tokenStmt->close();
+            } else {
+                $deviceTokenShown = "";
+                $errors[] = "Unable to generate the device token.";
+            }
+        } catch (Throwable $exception) {
+            $errors[] = "Unable to generate the device token.";
+        }
+    } elseif ($isStore && isset($_POST["store_status_update"])) {
         $nextStoreStatus = ($_POST["store_is_open"] ?? "0") === "1" ? 1 : 0;
         $statusStmt = $mysqli->prepare("UPDATE users SET store_is_open = ? WHERE id = ? AND account_type = 'store' LIMIT 1");
         if ($statusStmt) {
@@ -1210,6 +1232,19 @@ if ($isStore) {
             <?php endif; ?>
 
             <?php if ($isStore): ?>
+                <section style="margin:0 0 18px;padding:16px;border:1px solid #CBD5E1;border-radius:14px;background:#fff;">
+                    <strong style="display:block;color:#0F172A;font-size:15px;">ESP-12E Wi-Fi button</strong>
+                    <p style="margin:6px 0 12px;color:#64748B;font-size:13px;line-height:1.5;">Connect an ESP-12E board to this store. Pressing its button will switch the store between open and closed. Generate a device token and put it in the ESP-12E sketch.</p>
+                    <?php if ($deviceTokenShown !== ""): ?>
+                        <label for="iot-device-token" style="display:block;font-size:12px;font-weight:700;margin-bottom:5px;">Copy this token now</label>
+                        <input id="iot-device-token" readonly value="<?php echo escape($deviceTokenShown); ?>" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #CBD5E1;border-radius:8px;font-family:monospace;">
+                    <?php endif; ?>
+                    <form method="post" style="margin-top:10px;">
+                        <input type="hidden" name="generate_device_token" value="1">
+                        <button type="submit" class="btn" style="padding:9px 13px;">Generate / replace device token</button>
+                    </form>
+                    <small style="display:block;margin-top:8px;color:#64748B;">Replacing the token disconnects the old device. Keep the token private.</small>
+                </section>
                 <form method="post" id="store-status-form">
                 <input type="hidden" name="store_status_update" value="1">
                 <input type="hidden" name="store_is_open" id="store-status-value" value="<?php echo $profile["store_is_open"] === 1 ? "1" : "0"; ?>">

@@ -1,8 +1,8 @@
 <?php
 $DB_HOST = "localhost";
-$DB_USER = "root";
-$DB_PASS = "";
-$DB_NAME = "lokal_app";
+$DB_USER = "ffohsghk_lokaluser";
+$DB_PASS = "3i7N3GH.1+V1upMW";
+$DB_NAME = "ffohsghk_lokal_app";
 
 
 function quote_identifier(string $identifier): string
@@ -69,6 +69,7 @@ function ensure_users_schema(mysqli $mysqli): void
             store_lng DECIMAL(10, 7) DEFAULT NULL,
             store_hours VARCHAR(255) DEFAULT NULL,
             store_is_open TINYINT(1) NOT NULL DEFAULT 1,
+            store_device_token_hash CHAR(64) DEFAULT NULL,
             is_verified TINYINT(1) NOT NULL DEFAULT 0,
             first_name VARCHAR(100) NOT NULL,
             middle_name VARCHAR(100) NOT NULL,
@@ -95,6 +96,7 @@ function ensure_users_schema(mysqli $mysqli): void
         "store_lng" => "ALTER TABLE users ADD COLUMN store_lng DECIMAL(10, 7) DEFAULT NULL AFTER store_lat",
         "store_hours" => "ALTER TABLE users ADD COLUMN store_hours VARCHAR(255) DEFAULT NULL AFTER store_lng",
         "store_is_open" => "ALTER TABLE users ADD COLUMN store_is_open TINYINT(1) NOT NULL DEFAULT 1 AFTER store_hours",
+        "store_device_token_hash" => "ALTER TABLE users ADD COLUMN store_device_token_hash CHAR(64) DEFAULT NULL AFTER store_is_open",
         "is_verified" => "ALTER TABLE users ADD COLUMN is_verified TINYINT(1) NOT NULL DEFAULT 0 AFTER store_is_open",
         "user_address" => "ALTER TABLE users ADD COLUMN user_address VARCHAR(255) DEFAULT NULL AFTER store_hours",
         "user_lat" => "ALTER TABLE users ADD COLUMN user_lat DECIMAL(10, 7) DEFAULT NULL AFTER user_address",
